@@ -1,0 +1,656 @@
+// Perazim Fleet Management - Prisma Schema
+// Redesigned from PHP/CodeIgniter source
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// AUTH & USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  username  String   @unique
+  password  String // bcrypt hashed
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissions UserPermissions?
+  trips       Trip[]           @relation("TripCreatedBy")
+
+  @@map("users")
+}
+
+model UserPermissions {
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Vehicle permissions
+  vehicleList        Boolean @default(false)
+  vehicleView        Boolean @default(false)
+  vehicleEdit        Boolean @default(false)
+  vehicleAdd         Boolean @default(false)
+  vehicleGroup       Boolean @default(false)
+  vehicleGroupAdd    Boolean @default(false)
+  vehicleGroupAction Boolean @default(false)
+
+  // Driver permissions
+  driverList Boolean @default(false)
+  driverEdit Boolean @default(false)
+  driverAdd  Boolean @default(false)
+
+  // Trip permissions
+  tripList Boolean @default(false)
+  tripEdit Boolean @default(false)
+  tripAdd  Boolean @default(false)
+
+  // Customer permissions
+  customerList Boolean @default(false)
+  customerEdit Boolean @default(false)
+  customerAdd  Boolean @default(false)
+
+  // Fuel permissions
+  fuelList Boolean @default(false)
+  fuelEdit Boolean @default(false)
+  fuelAdd  Boolean @default(false)
+
+  // Reminder permissions
+  reminderList   Boolean @default(false)
+  reminderDelete Boolean @default(false)
+  reminderAdd    Boolean @default(false)
+
+  // Income/Expense permissions
+  incomeExpenseList Boolean @default(false)
+  incomeExpenseEdit Boolean @default(false)
+
+  @@map("user_permissions")
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMERS
+// ─────────────────────────────────────────────
+
+model Customer {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  phone      String?
+  address    String?  @db.Text
+  password   String? // bcrypt hashed — for customer portal login
+  resetToken String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  trips      Trip[]
+  quotations Quotation[]
+
+  @@map("customers")
+}
+
+// ─────────────────────────────────────────────
+// VEHICLES
+// ─────────────────────────────────────────────
+
+model VehicleGroup {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  vehicles Vehicle[]
+
+  @@map("vehicle_groups")
+}
+
+model Vehicle {
+  id                 Int           @id @default(autoincrement())
+  registrationNo     String        @unique
+  name               String
+  chassisNo          String
+  engineNo           String
+  apiUsername        String? // Cartrack Equipment ID
+  groupId            Int?
+  group              VehicleGroup? @relation(fields: [groupId], references: [id])
+  registrationExpiry DateTime?
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  drivers        Driver[]
+  trips          Trip[]
+  fuel           Fuel[]
+  positions      Position[]
+  geofences      GeofenceVehicle[]
+  geofenceEvents GeofenceEvent[]
+  reminders      Reminder[]
+  incomeExpenses IncomeExpense[]
+  loadSheets     LoadSheet[]
+
+  @@map("vehicles")
+}
+
+// ─────────────────────────────────────────────
+// TRAILERS
+// ─────────────────────────────────────────────
+
+model Trailer {
+  id             Int       @id @default(autoincrement())
+  registrationNo String    @unique
+  make           String?
+  type           String?
+  chassisNo      String?
+  loadCapacity   Float?
+  colour         String?
+  licenseExpiry  DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  drivers    Driver[]
+  trips      Trip[]
+  loadSheets LoadSheet[]
+
+  @@map("trailers")
+}
+
+// ─────────────────────────────────────────────
+// DRIVERS
+// ─────────────────────────────────────────────
+
+model Driver {
+  id                Int       @id @default(autoincrement())
+  name              String
+  mobile            String
+  email             String    @unique
+  age               Int?
+  address           String?   @db.Text
+  licenseNo         String
+  licenseExpiry     DateTime?
+  totalExperience   String?
+  dateOfJoining     DateTime?
+  reference         String?
+  password          String? // bcrypt hashed — for driver app login
+  resetToken        String?
+  isActive          Boolean   @default(true)
+  assignedVehicleId Int?
+  assignedVehicle   Vehicle?  @relation(fields: [assignedVehicleId], references: [id])
+  assignedTrailerId Int?
+  assignedTrailer   Trailer?  @relation(fields: [assignedTrailerId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  trips            Trip[]
+  tripLegs         TripLeg[]
+  fuel             Fuel[]
+  timesheets       Timesheet[]
+  loadSheets       LoadSheet[]
+  driverExpenses   DriverExpense[]
+  inspections      Inspection[]
+  inspectionImages InspectionImage[]
+
+  @@map("drivers")
+}
+
+// ─────────────────────────────────────────────
+// TRIPS
+// ─────────────────────────────────────────────
+
+enum TripStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TripType {
+  SINGLE
+  MULTI_LEG
+}
+
+model Trip {
+  id           Int        @id @default(autoincrement())
+  trackingCode String     @unique @default(cuid())
+  type         TripType   @default(SINGLE)
+  status       TripStatus @default(PENDING)
+
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+  vehicleId  Int
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
+  driverId   Int
+  driver     Driver   @relation(fields: [driverId], references: [id])
+  trailerId  Int?
+  trailer    Trailer? @relation(fields: [trailerId], references: [id])
+
+  fromLocation String
+  toLocation   String
+  fromLat      Float?
+  fromLng      Float?
+  toLat        Float?
+  toLng        Float?
+  startDate    DateTime
+  endDate      DateTime?
+
+  // Customer's vehicle being transported
+  customerVehicleMake         String?
+  customerVehicleColour       String?
+  customerVehicleRegistration String?
+  customerVehicleVin          String?
+  customerVehicleStock        String?
+  customerVehicleEngine       String?
+
+  // Trip financials
+  amount      Decimal? @db.Decimal(10, 2)
+  vatAmount   Decimal? @db.Decimal(10, 2)
+  totalAmount Decimal? @db.Decimal(10, 2)
+
+  // Vehicle condition photos (up to 8)
+  picture1 String?
+  picture2 String?
+  picture3 String?
+  picture4 String?
+  picture5 String?
+  picture6 String?
+  picture7 String?
+  picture8 String?
+
+  createdById Int?
+  createdBy   User?    @relation("TripCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  legs             TripLeg[]
+  payment          TripPayment?
+  expenses         TripExpense[]
+  inspections      Inspection[]
+  inspectionImages InspectionImage[]
+  positions        Position[]
+
+  @@map("trips")
+}
+
+model TripLeg {
+  id            Int       @id @default(autoincrement())
+  tripId        Int
+  trip          Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  driverId      Int
+  driver        Driver    @relation(fields: [driverId], references: [id])
+  startLocation String
+  endLocation   String
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  order         Int       @default(1)
+  status        String    @default("pending") // pending | completed
+
+  @@map("trip_legs")
+}
+
+model TripExpense {
+  id          Int      @id @default(autoincrement())
+  tripId      Int
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  @@map("trip_expenses")
+}
+
+model TripPayment {
+  id        Int       @id @default(autoincrement())
+  tripId    Int       @unique
+  trip      Trip      @relation(fields: [tripId], references: [id])
+  vehicleId Int
+  amount    Decimal   @db.Decimal(10, 2)
+  method    String    @default("payfast") // payfast | manual | eft
+  status    String    @default("pending") // pending | paid | failed
+  reference String?
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("trip_payments")
+}
+
+// ─────────────────────────────────────────────
+// QUOTATIONS
+// ─────────────────────────────────────────────
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  CONVERTED
+}
+
+model Quotation {
+  id          Int             @id @default(autoincrement())
+  number      String?         @unique
+  customerId  Int
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  information String?         @db.Text
+  pickup      String
+  dropoff     String
+  pickupLat   Float?
+  pickupLng   Float?
+  dropoffLat  Float?
+  dropoffLng  Float?
+  distance    Float?
+  pickupDate  DateTime?
+  dropoffDate DateTime?
+  status      QuotationStatus @default(DRAFT)
+  isConverted Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  items QuotationItem[]
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id           Int       @id @default(autoincrement())
+  quotationId  Int
+  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description  String
+  colour       String?
+  registration String?
+  quantity     Int       @default(1)
+  unitPrice    Decimal   @db.Decimal(10, 2)
+  total        Decimal   @db.Decimal(10, 2)
+
+  @@map("quotation_items")
+}
+
+// ─────────────────────────────────────────────
+// INVOICES
+// ─────────────────────────────────────────────
+
+model Invoice {
+  id         Int       @id @default(autoincrement())
+  number     String    @unique
+  customerId Int
+  amount     Decimal   @db.Decimal(10, 2)
+  vatAmount  Decimal   @db.Decimal(10, 2)
+  total      Decimal   @db.Decimal(10, 2)
+  status     String    @default("unpaid") // unpaid | paid | overdue
+  dueDate    DateTime?
+  paidAt     DateTime?
+  notes      String?   @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("invoices")
+}
+
+// ─────────────────────────────────────────────
+// FUEL
+// ─────────────────────────────────────────────
+
+model Fuel {
+  id           Int      @id @default(autoincrement())
+  vehicleId    Int
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+  driverId     Int?
+  driver       Driver?  @relation(fields: [driverId], references: [id])
+  litres       Float
+  costPerLitre Decimal  @db.Decimal(10, 2)
+  totalCost    Decimal  @db.Decimal(10, 2)
+  odometer     Float?
+  fillDate     DateTime
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  @@map("fuel")
+}
+
+// ─────────────────────────────────────────────
+// INCOME & EXPENSES
+// ─────────────────────────────────────────────
+
+enum IncomeExpenseType {
+  INCOME
+  EXPENSE
+}
+
+model IncomeExpense {
+  id          Int               @id @default(autoincrement())
+  vehicleId   Int?
+  vehicle     Vehicle?          @relation(fields: [vehicleId], references: [id])
+  type        IncomeExpenseType
+  description String
+  amount      Decimal           @db.Decimal(10, 2)
+  date        DateTime
+  createdAt   DateTime          @default(now())
+
+  @@map("income_expenses")
+}
+
+model DriverExpense {
+  id          Int      @id @default(autoincrement())
+  driverId    Int
+  driver      Driver   @relation(fields: [driverId], references: [id])
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  @@map("driver_expenses")
+}
+
+// ─────────────────────────────────────────────
+// GEOFENCING
+// ─────────────────────────────────────────────
+
+model Geofence {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  area        Json // GeoJSON polygon coordinates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicles GeofenceVehicle[]
+  events   GeofenceEvent[]
+
+  @@map("geofences")
+}
+
+model GeofenceVehicle {
+  geofenceId Int
+  geofence   Geofence @relation(fields: [geofenceId], references: [id], onDelete: Cascade)
+  vehicleId  Int
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@id([geofenceId, vehicleId])
+  @@map("geofence_vehicles")
+}
+
+model GeofenceEvent {
+  id         Int      @id @default(autoincrement())
+  vehicleId  Int
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
+  geofenceId Int
+  geofence   Geofence @relation(fields: [geofenceId], references: [id])
+  eventType  String // entered | exited
+  latitude   Float
+  longitude  Float
+  occurredAt DateTime @default(now())
+
+  @@map("geofence_events")
+}
+
+// ─────────────────────────────────────────────
+// GPS POSITIONS
+// ─────────────────────────────────────────────
+
+model Position {
+  id         Int      @id @default(autoincrement())
+  tripId     Int?
+  trip       Trip?    @relation(fields: [tripId], references: [id])
+  vehicleId  Int
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
+  latitude   Float
+  longitude  Float
+  altitude   Float?
+  speed      Float?
+  bearing    Float?
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+
+  @@map("positions")
+}
+
+// ─────────────────────────────────────────────
+// INSPECTIONS
+// ─────────────────────────────────────────────
+
+model InspectionCategory {
+  id       Int     @id @default(autoincrement())
+  name     String
+  isActive Boolean @default(true)
+  order    Int     @default(0)
+
+  items InspectionItem[]
+
+  @@map("inspection_categories")
+}
+
+model InspectionItem {
+  id         Int                @id @default(autoincrement())
+  categoryId Int
+  category   InspectionCategory @relation(fields: [categoryId], references: [id])
+  name       String
+  isActive   Boolean            @default(true)
+  order      Int                @default(0)
+
+  @@map("inspection_items")
+}
+
+model Inspection {
+  id        Int      @id @default(autoincrement())
+  tripId    Int
+  trip      Trip     @relation(fields: [tripId], references: [id])
+  driverId  Int
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  data      Json // { itemId: pass|fail|na, ... }
+  remarks   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images InspectionImage[]
+
+  @@map("inspections")
+}
+
+model InspectionImage {
+  id           Int         @id @default(autoincrement())
+  tripId       Int
+  trip         Trip        @relation(fields: [tripId], references: [id])
+  driverId     Int
+  driver       Driver      @relation(fields: [driverId], references: [id])
+  inspectionId Int?
+  inspection   Inspection? @relation(fields: [inspectionId], references: [id])
+  filename     String
+  path         String
+  createdAt    DateTime    @default(now())
+
+  @@map("inspection_images")
+}
+
+// ─────────────────────────────────────────────
+// LOAD SHEETS
+// ─────────────────────────────────────────────
+
+model LoadSheet {
+  id        Int      @id @default(autoincrement())
+  driverId  Int
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  vehicleId Int
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  trailerId Int?
+  trailer   Trailer? @relation(fields: [trailerId], references: [id])
+  data      Json // flexible load data
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("load_sheets")
+}
+
+// ─────────────────────────────────────────────
+// TIMESHEETS
+// ─────────────────────────────────────────────
+
+model Timesheet {
+  id        Int       @id @default(autoincrement())
+  driverId  Int
+  driver    Driver    @relation(fields: [driverId], references: [id])
+  clockIn   DateTime
+  clockOut  DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  @@map("timesheets")
+}
+
+// ─────────────────────────────────────────────
+// REMINDERS
+// ─────────────────────────────────────────────
+
+model Reminder {
+  id          Int      @id @default(autoincrement())
+  vehicleId   Int?
+  vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
+  title       String
+  description String?  @db.Text
+  dueDate     DateTime
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("reminders")
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────
+
+model Settings {
+  id           Int      @id @default(autoincrement())
+  companyName  String   @default("Perazim")
+  logo         String?
+  phone        String?
+  email        String?
+  address      String?  @db.Text
+  website      String?
+  vat          Float    @default(15)
+  currency     String   @default("ZAR")
+  googleApiKey String?
+  updatedAt    DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model SmtpSettings {
+  id        Int      @id @default(autoincrement())
+  host      String
+  port      Int      @default(587)
+  secure    Boolean  @default(false)
+  username  String
+  password  String
+  fromEmail String
+  replyTo   String?
+  updatedAt DateTime @updatedAt
+
+  @@map("smtp_settings")
+}
