@@ -2,12 +2,17 @@ import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import logo from '../../assets/uploads/pera.png';
+import CustomerSignUpModal from '../auth/CustomerSignUpModal';
+import CustomerSignInModal from '../auth/CustomerSignInModal';
 
 export default function Navbar() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
+  const [customerSignUpOpen, setCustomerSignUpOpen] = useState(false);
+  const [customerSignInOpen, setCustomerSignInOpen] = useState(false);
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-24">
@@ -47,18 +52,18 @@ export default function Navbar() {
               {loginOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg">
                   <Link
-                    to="/login?role=driver"
+                    to="/drivers/d_login"
                     className="block px-4 py-3 hover:bg-gray-100"
                   >
                     as Driver
                   </Link>
 
-                  <Link
-                    to="/login?role=customer"
-                    className="block px-4 py-3 hover:bg-gray-100"
+                  <button
+                    onClick={() => { setLoginOpen(false); setCustomerSignInOpen(true); }}
+                    className="block w-full text-left px-4 py-3 hover:bg-gray-100"
                   >
                     as Customer
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -79,18 +84,18 @@ export default function Navbar() {
               {signupOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg">
                   <Link
-                    to="/register?role=driver"
+                    to="/drivers/d_signup"
                     className="block px-4 py-3 hover:bg-gray-100"
                   >
                     as Driver
                   </Link>
 
-                  <Link
-                    to="/register?role=customer"
-                    className="block px-4 py-3 hover:bg-gray-100"
+                  <button
+                    onClick={() => { setSignupOpen(false); setCustomerSignUpOpen(true); }}
+                    className="block w-full text-left px-4 py-3 hover:bg-gray-100"
                   >
                     as Customer
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -99,5 +104,15 @@ export default function Navbar() {
         </div>
       </div>
     </header>
+
+    <CustomerSignUpModal
+      open={customerSignUpOpen}
+      onClose={() => setCustomerSignUpOpen(false)}
+    />
+    <CustomerSignInModal
+      open={customerSignInOpen}
+      onClose={() => setCustomerSignInOpen(false)}
+    />
+    </>
   );
 }

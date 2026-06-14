@@ -1,8 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
+import { useCustomerAuthStore } from './stores/customerAuthStore';
+import { useDriverAuthStore }   from './stores/driverAuthStore';
 import { useEffect } from 'react';
 
-import DashboardLayout from './components/layout/DashboardLayout';
+import DashboardLayout     from './components/layout/DashboardLayout';
+import CustomerPortalPage  from './pages/customer/CustomerPortalPage';
+import DriverPortalPage    from './pages/driver/DriverPortalPage';
+import DriverSignupPage    from './pages/driver/DriverSignupPage';
+import DriverLoginPage     from './pages/driver/DriverLoginPage';
 
 import HomePage        from './pages/public/HomePage';
 import LoginPage       from './pages/auth/LoginPage';
@@ -24,21 +30,64 @@ import LoadsheetsPage     from './pages/loadsheets/LoadsheetsPage';
 import PaymentsPage       from './pages/payments/PaymentsPage';
 import UsersPage          from './pages/users/UsersPage';
 import SettingsPage       from './pages/settings/SettingsPage';
+import SearchPage         from './pages/search/SearchPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore((s) => s.user);
+  const user      = useAuthStore((s) => s.user);
+  const isLoading = useAuthStore((s) => s.isLoading);
+
+  if (isLoading) return null; // wait for session check before deciding
   return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function CustomerRoute({ children }: { children: React.ReactNode }) {
+  const fetchMe   = useCustomerAuthStore((s) => s.fetchMe);
+  const customer  = useCustomerAuthStore((s) => s.customer);
+  const isLoading = useCustomerAuthStore((s) => s.isLoading);
+  // Verify session only when this route is actually mounted.
+  useEffect(() => { fetchMe(); }, [fetchMe]);
+  if (isLoading) return null;
+  return customer ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+function DriverRoute({ children }: { children: React.ReactNode }) {
+  const fetchMe   = useDriverAuthStore((s) => s.fetchMe);
+  const driver    = useDriverAuthStore((s) => s.driver);
+  const isLoading = useDriverAuthStore((s) => s.isLoading);
+  // Verify session only when this route is actually mounted.
+  useEffect(() => { fetchMe(); }, [fetchMe]);
+  if (isLoading) return null;
+  return driver ? <>{children}</> : <Navigate to="/drivers/d_login" replace />;
 }
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe);
+  const user    = useAuthStore((s) => s.user);
+
+  // Only verify the admin session on mount — customer/driver sessions are
+  // verified inside their own portal components, not on every page load.
   useEffect(() => { fetchMe(); }, [fetchMe]);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
-        <Route path="/"      element={<HomePage />} />
+        <Route
+          path="/"
+          element={
+            // user is rehydrated synchronously from localStorage by Zustand
+            // persist — no need to wait for isLoading.
+            user ? <Navigate to="/app/dashboard" replace /> : <HomePage />
+          }
+        />
         <Route path="/login" element={<LoginPage />} />
+
+        {/* Customer portal */}
+        <Route path="/customer" element={<CustomerRoute><CustomerPortalPage /></CustomerRoute>} />
+
+        {/* Driver portal */}
+        <Route path="/drivers/d_signup" element={<DriverSignupPage />} />
+        <Route path="/drivers/d_login"  element={<DriverLoginPage />} />
+        <Route path="/driver"           element={<DriverRoute><DriverPortalPage /></DriverRoute>} />
 
         <Route path="/app" element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
           <Route index element={<Navigate to="/app/dashboard" replace />} />
@@ -58,6 +107,7 @@ export default function App() {
           <Route path="payments/*"       element={<PaymentsPage />} />
           <Route path="users/*"          element={<UsersPage />} />
           <Route path="settings/*"       element={<SettingsPage />} />
+          <Route path="search"           element={<SearchPage />} />
           <Route path="*"                element={<NotFoundPage />} />
         </Route>
       </Routes>

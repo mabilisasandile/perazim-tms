@@ -40,16 +40,20 @@ interface Invoice {
   dueDate: string | null;
   paidAt: string | null;
   notes: string | null;
+  vehicleDescription: string | null;
+  vehicleCondition: 'Runner' | 'Non-Runner' | null;
   createdAt: string;
   customer?: { id: number; name: string } | null;
 }
 
 const schema = z.object({
-  customerId: z.coerce.number().int().positive('Customer required'),
-  amount:     z.coerce.number().min(0, 'Amount required'),
-  vatRate:    z.coerce.number().min(0).default(15),
-  dueDate:    z.string().optional(),
-  notes:      z.string().optional(),
+  customerId:         z.coerce.number().int().positive('Customer required'),
+  amount:             z.coerce.number().min(0, 'Amount required'),
+  vatRate:            z.coerce.number().min(0).default(15),
+  dueDate:            z.string().optional(),
+  notes:              z.string().optional(),
+  vehicleDescription: z.string().optional(),
+  vehicleCondition:   z.enum(['Runner', 'Non-Runner']).optional().nullable(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -241,6 +245,20 @@ export default function InvoicesPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea {...register('notes')} rows={2} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Description</label>
+              <input {...register('vehicleDescription')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. Toyota Hilux – ABC 123 GP" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Condition</label>
+              <select {...register('vehicleCondition')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                <option value="">Select condition</option>
+                <option value="Runner">Runner</option>
+                <option value="Non-Runner">Non-Runner</option>
+              </select>
+            </div>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
             <button type="submit" disabled={isSubmitting || createMut.isPending}
@@ -278,6 +296,20 @@ export default function InvoicesPage() {
                 <p className="font-medium">{value}</p>
               </div>
             ))}
+            {viewInvoice.vehicleDescription && (
+              <div className="col-span-2">
+                <p className="text-gray-500">Vehicle</p>
+                <p className="font-medium">{viewInvoice.vehicleDescription}</p>
+              </div>
+            )}
+            {viewInvoice.vehicleCondition && (
+              <div>
+                <p className="text-gray-500">Vehicle Condition</p>
+                <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${viewInvoice.vehicleCondition === 'Non-Runner' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                  {viewInvoice.vehicleCondition}
+                </span>
+              </div>
+            )}
             {viewInvoice.notes && (
               <div className="col-span-2">
                 <p className="text-gray-500">Notes</p>

@@ -60,10 +60,14 @@ export const tripsService = {
     const vatAmount = amount * vatRate / 100;
     const totalAmount = amount + vatAmount;
 
+    const { startDate, endDate, ...restTripData } = tripData;
+
     return prisma.$transaction(async (tx) => {
       const trip = await tx.trip.create({
         data: {
-          ...tripData,
+          ...restTripData,
+          startDate: new Date(startDate),
+          endDate:   endDate ? new Date(endDate) : null,
           vatAmount,
           totalAmount,
           createdById,

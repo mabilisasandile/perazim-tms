@@ -18,6 +18,7 @@ interface Trip {
   startDate: string;
   endDate: string | null;
   totalAmount: number | null;
+  vehicleCondition: 'Runner' | 'Non-Runner' | null;
   customer: { id: number; name: string };
   vehicle: { id: number; name: string; registrationNo: string };
   driver: { id: number; name: string };
@@ -32,7 +33,7 @@ const schema = z.object({
   customerId:   z.coerce.number().int().positive('Customer is required'),
   vehicleId:    z.coerce.number().int().positive('Vehicle is required'),
   driverId:     z.coerce.number().int().positive('Driver is required'),
-  trailerId:    z.coerce.number().optional().nullable(),
+  trailerId:    z.preprocess(v => (!v || v === '' || Number(v) === 0) ? null : Number(v), z.number().int().positive().optional().nullable()),
   fromLocation: z.string().min(1, 'From location is required'),
   toLocation:   z.string().min(1, 'To location is required'),
   startDate:    z.string().min(1, 'Start date is required'),
@@ -42,6 +43,7 @@ const schema = z.object({
   customerVehicleColour:       z.string().optional(),
   customerVehicleRegistration: z.string().optional(),
   customerVehicleVin:          z.string().optional(),
+  vehicleCondition:            z.enum(['Runner', 'Non-Runner']).optional().nullable(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -85,7 +87,10 @@ export default function TripsPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (d: FormData) => api.post('/trips', d),
+    mutationFn: (d: FormData) => api.post('/trips', {
+      ...d,
+      trailerId: d.trailerId || null,
+    }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); setModalOpen(false); reset(); },
   });
 
@@ -258,6 +263,14 @@ export default function TripsPage() {
                 <label className="block text-xs text-gray-500 mb-1">VIN Number</label>
                 <input {...register('customerVehicleVin')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Vehicle Condition</label>
+                <select {...register('vehicleCondition')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                  <option value="">Select condition</option>
+                  <option value="Runner">Runner</option>
+                  <option value="Non-Runner">Non-Runner</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -285,6 +298,12 @@ export default function TripsPage() {
               <div><p className="text-gray-500">Start Date</p><p className="font-medium">{format(new Date(viewTrip.startDate), 'dd MMM yyyy')}</p></div>
               <div><p className="text-gray-500">End Date</p><p className="font-medium">{viewTrip.endDate ? format(new Date(viewTrip.endDate), 'dd MMM yyyy') : '—'}</p></div>
               <div><p className="text-gray-500">Total Amount</p><p className="font-medium text-lg">{viewTrip.totalAmount ? new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(viewTrip.totalAmount)) : '—'}</p></div>
+              <div>
+                <p className="text-gray-500">Vehicle Condition</p>
+                <p className={`font-medium ${viewTrip.vehicleCondition === 'Non-Runner' ? 'text-red-600' : viewTrip.vehicleCondition === 'Runner' ? 'text-green-600' : 'text-gray-400'}`}>
+                  {viewTrip.vehicleCondition ?? '—'}
+                </p>
+              </div>
             </div>
           </div>
         </Modal>

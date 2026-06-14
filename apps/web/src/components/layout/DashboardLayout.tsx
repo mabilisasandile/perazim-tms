@@ -3,9 +3,9 @@ import {
   LayoutDashboard, Truck, Users, Route, UserCircle,
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
-  ClipboardList, Package
+  ClipboardList, Package, Search
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import logo from '../../assets/uploads/pera.png';
 
@@ -30,10 +30,18 @@ const navItems = [
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) navigate(`/app/search?q=${encodeURIComponent(q)}`);
+  };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -76,10 +84,20 @@ export default function DashboardLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
-          <h1 className="text-sm text-gray-500">
+        <header className="bg-white border-b px-6 py-3 flex items-center gap-4 shrink-0">
+          <h1 className="text-sm text-gray-500 shrink-0">
             Welcome back, <span className="font-semibold text-gray-900">{user?.name}</span>
           </h1>
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search bookings, VIN, reg, invoice, customer, driver…"
+              className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
+            />
+          </form>
         </header>
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet/>

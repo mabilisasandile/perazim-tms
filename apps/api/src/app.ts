@@ -30,6 +30,7 @@ import reminderRoutes      from './modules/reminders/reminders.routes';
 import settingsRoutes      from './modules/settings/settings.routes';
 import positionRoutes      from './modules/positions/positions.routes';
 import incomeExpenseRoutes from './modules/income-expenses/income-expenses.routes';
+import searchRoutes        from './modules/search/search.routes';
 
 const app = express();
 
@@ -78,6 +79,7 @@ app.use(`${v1}/reminders`,      reminderRoutes);
 app.use(`${v1}/settings`,       settingsRoutes);
 app.use(`${v1}/positions`,      positionRoutes);
 app.use(`${v1}/income-expenses`, incomeExpenseRoutes);
+app.use(`${v1}/search`,         searchRoutes);
 
 // ─── Error Handling ───────────────────────────────────────
 app.use(notFound);

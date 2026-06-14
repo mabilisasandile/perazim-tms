@@ -126,15 +126,16 @@ model Vehicle {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  drivers        Driver[]
-  trips          Trip[]
-  fuel           Fuel[]
-  positions      Position[]
-  geofences      GeofenceVehicle[]
-  geofenceEvents GeofenceEvent[]
-  reminders      Reminder[]
-  incomeExpenses IncomeExpense[]
-  loadSheets     LoadSheet[]
+  drivers           Driver[]
+  trips             Trip[]
+  fuel              Fuel[]
+  positions         Position[]
+  geofences         GeofenceVehicle[]
+  geofenceEvents    GeofenceEvent[]
+  reminders         Reminder[]
+  incomeExpenses    IncomeExpense[]
+  loadSheets        LoadSheet[]
+  assignedTrailers  Trailer[]         @relation("VehicleAssignedTrailers")
 
   @@map("vehicles")
 }
@@ -144,17 +145,22 @@ model Vehicle {
 // ─────────────────────────────────────────────
 
 model Trailer {
-  id             Int       @id @default(autoincrement())
-  registrationNo String    @unique
-  make           String?
-  type           String?
-  chassisNo      String?
-  loadCapacity   Float?
-  colour         String?
-  licenseExpiry  DateTime?
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  registrationNo    String    @unique
+  make              String?
+  type              String?   // legacy free-text field
+  category          String?   // Flat Deck | Superlink | Lowbed | Tautliner
+  chassisNo         String?
+  loadCapacity      Float?
+  colour            String?
+  licenseNo         String?
+  licenseExpiry     DateTime?
+  status            String    @default("Available") // Available | In Use | Under Maintenance
+  isActive          Boolean   @default(true)
+  assignedVehicleId Int?
+  assignedVehicle   Vehicle?  @relation("VehicleAssignedTrailers", fields: [assignedVehicleId], references: [id], onDelete: SetNull)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   drivers    Driver[]
   trips      Trip[]
@@ -248,6 +254,7 @@ model Trip {
   customerVehicleVin          String?
   customerVehicleStock        String?
   customerVehicleEngine       String?
+  vehicleCondition            String? // Runner | Non-Runner
 
   // Trip financials
   amount      Decimal? @db.Decimal(10, 2)
@@ -359,15 +366,16 @@ model Quotation {
 }
 
 model QuotationItem {
-  id           Int       @id @default(autoincrement())
-  quotationId  Int
-  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  description  String
-  colour       String?
-  registration String?
-  quantity     Int       @default(1)
-  unitPrice    Decimal   @db.Decimal(10, 2)
-  total        Decimal   @db.Decimal(10, 2)
+  id               Int       @id @default(autoincrement())
+  quotationId      Int
+  quotation        Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description      String
+  colour           String?
+  registration     String?
+  vehicleCondition String? // Runner | Non-Runner
+  quantity         Int       @default(1)
+  unitPrice        Decimal   @db.Decimal(10, 2)
+  total            Decimal   @db.Decimal(10, 2)
 
   @@map("quotation_items")
 }
@@ -377,18 +385,20 @@ model QuotationItem {
 // ─────────────────────────────────────────────
 
 model Invoice {
-  id         Int       @id @default(autoincrement())
-  number     String    @unique
-  customerId Int
-  amount     Decimal   @db.Decimal(10, 2)
-  vatAmount  Decimal   @db.Decimal(10, 2)
-  total      Decimal   @db.Decimal(10, 2)
-  status     String    @default("unpaid") // unpaid | paid | overdue
-  dueDate    DateTime?
-  paidAt     DateTime?
-  notes      String?   @db.Text
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id                 Int       @id @default(autoincrement())
+  number             String    @unique
+  customerId         Int
+  amount             Decimal   @db.Decimal(10, 2)
+  vatAmount          Decimal   @db.Decimal(10, 2)
+  total              Decimal   @db.Decimal(10, 2)
+  status             String    @default("unpaid") // unpaid | paid | overdue
+  dueDate            DateTime?
+  paidAt             DateTime?
+  notes              String?   @db.Text
+  vehicleDescription String?
+  vehicleCondition   String? // Runner | Non-Runner
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("invoices")
 }

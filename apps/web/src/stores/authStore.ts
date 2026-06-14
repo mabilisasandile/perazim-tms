@@ -41,6 +41,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       fetchMe: async () => {
+            // No stored session — skip the network call entirely.
+            // Zustand persist rehydrates synchronously, so user is already set
+            // (or null) by the time this runs.
+            if (!get().user) return;
             // Prevent concurrent fetches (React StrictMode can mount twice)
             if (get().isLoading) return;
             set({ isLoading: true });

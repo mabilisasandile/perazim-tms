@@ -29,6 +29,7 @@ export const createTripSchema = z.object({
   customerVehicleVin: z.string().optional(),
   customerVehicleStock: z.string().optional(),
   customerVehicleEngine: z.string().optional(),
+  vehicleCondition: z.enum(['Runner', 'Non-Runner']).optional().nullable(),
   legs: z.array(tripLegSchema).optional(),
 });
 

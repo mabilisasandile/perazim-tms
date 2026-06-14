@@ -42,13 +42,15 @@ export const invoicesService = {
     const inv = await prisma.invoice.create({
       data: {
         number,
-        customerId: data.customerId,
-        amount:     data.amount,
+        customerId:         data.customerId,
+        amount:             data.amount,
         vatAmount,
         total,
-        dueDate:    data.dueDate ? new Date(data.dueDate) : null,
-        notes:      data.notes,
-        status:     'unpaid',
+        dueDate:            data.dueDate ? new Date(data.dueDate) : null,
+        notes:              data.notes,
+        vehicleDescription: data.vehicleDescription ?? null,
+        vehicleCondition:   data.vehicleCondition   ?? null,
+        status:             'unpaid',
       },
     });
     const customer = await prisma.customer.findUnique({

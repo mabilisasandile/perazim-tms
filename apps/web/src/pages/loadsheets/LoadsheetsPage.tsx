@@ -8,7 +8,7 @@ import { Plus, Loader2, AlertCircle, Eye, Trash2, PlusCircle } from 'lucide-reac
 import Modal from '../../components/ui/Modal';
 import { format } from 'date-fns';
 
-interface LoadItem { description:string; registration:string; make:string; colour:string; vin:string; condition:string; }
+interface LoadItem { description:string; registration:string; make:string; colour:string; vin:string; condition:string; vehicleStatus:string; }
 interface SheetData { items:LoadItem[]; }
 interface LoadSheet {
   id:number; notes:string|null; createdAt:string;
@@ -19,12 +19,13 @@ interface LoadSheet {
 }
 
 const itemSchema = z.object({
-  description: z.string().min(1,'Required'),
-  registration:z.string().optional().default(''),
-  make:        z.string().optional().default(''),
-  colour:      z.string().optional().default(''),
-  vin:         z.string().optional().default(''),
-  condition:   z.enum(['Good','Fair','Poor']).default('Good'),
+  description:   z.string().min(1,'Required'),
+  registration:  z.string().optional().default(''),
+  make:          z.string().optional().default(''),
+  colour:        z.string().optional().default(''),
+  vin:           z.string().optional().default(''),
+  condition:     z.enum(['Good','Fair','Poor']).default('Good'),
+  vehicleStatus: z.enum(['Runner','Non-Runner']).default('Runner'),
 });
 const schema = z.object({
   driverId:  z.coerce.number().int().positive('Driver required'),
@@ -49,7 +50,7 @@ export default function LoadsheetsPage() {
 
   const { register, handleSubmit, control, reset, formState:{errors,isSubmitting} } = useForm<FormData>({
     resolver:zodResolver(schema),
-    defaultValues:{items:[{description:'',registration:'',make:'',colour:'',vin:'',condition:'Good'}]},
+    defaultValues:{items:[{description:'',registration:'',make:'',colour:'',vin:'',condition:'Good',vehicleStatus:'Runner'}]},
   });
   const { fields, append, remove } = useFieldArray({control, name:'items'});
 
@@ -69,7 +70,7 @@ export default function LoadsheetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Load Sheets</h1>
-        <button onClick={()=>{ reset({items:[{description:'',registration:'',make:'',colour:'',vin:'',condition:'Good'}]}); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg"><Plus size={16}/> New Load Sheet</button>
+        <button onClick={()=>{ reset({items:[{description:'',registration:'',make:'',colour:'',vin:'',condition:'Good',vehicleStatus:'Runner'}]}); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg"><Plus size={16}/> New Load Sheet</button>
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden">
@@ -115,12 +116,12 @@ export default function LoadsheetsPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-semibold text-gray-700">Vehicles Being Transported *</p>
-              <button type="button" onClick={()=>append({description:'',registration:'',make:'',colour:'',vin:'',condition:'Good'})} className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700"><PlusCircle size={14}/> Add vehicle</button>
+              <button type="button" onClick={()=>append({description:'',registration:'',make:'',colour:'',vin:'',condition:'Good',vehicleStatus:'Runner'})} className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700"><PlusCircle size={14}/> Add vehicle</button>
             </div>
             <div className="space-y-3">
               {fields.map((field,i)=>(
                 <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 bg-gray-50 rounded-lg">
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">Description *</label>
                     <input {...register(`items.${i}.description`)} placeholder="e.g. Toyota Hilux" className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"/>
                     {errors.items?.[i]?.description&&<p className="text-red-500 text-xs">{errors.items[i]?.description?.message}</p>}
@@ -128,7 +129,11 @@ export default function LoadsheetsPage() {
                   <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Reg No</label><input {...register(`items.${i}.registration`)} placeholder="ABC 123" className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"/></div>
                   <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Make</label><input {...register(`items.${i}.make`)} placeholder="Toyota" className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"/></div>
                   <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Colour</label><input {...register(`items.${i}.colour`)} placeholder="White" className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"/></div>
-                  <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Condition</label>
+                  <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Status</label>
+                    <select {...register(`items.${i}.vehicleStatus`)} className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                      <option>Runner</option><option>Non-Runner</option>
+                    </select></div>
+                  <div className="col-span-1"><label className="block text-xs text-gray-500 mb-1">Condition</label>
                     <select {...register(`items.${i}.condition`)} className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
                       <option>Good</option><option>Fair</option><option>Poor</option>
                     </select></div>
@@ -164,10 +169,11 @@ export default function LoadsheetsPage() {
               <p className="font-semibold text-gray-700 mb-2">Loaded Vehicles ({viewing.data?.items?.length??0})</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border rounded-lg overflow-hidden">
-                  <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Reg</th><th className="px-3 py-2 text-left">Make</th><th className="px-3 py-2 text-left">Colour</th><th className="px-3 py-2 text-left">Condition</th></tr></thead>
+                  <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2 text-left">Reg</th><th className="px-3 py-2 text-left">Make</th><th className="px-3 py-2 text-left">Colour</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Condition</th></tr></thead>
                   <tbody className="divide-y">
                     {(viewing.data?.items??[]).map((item:LoadItem,i:number)=>(
                       <tr key={i}><td className="px-3 py-2">{item.description||'—'}</td><td className="px-3 py-2 text-gray-500">{item.registration||'—'}</td><td className="px-3 py-2 text-gray-500">{item.make||'—'}</td><td className="px-3 py-2 text-gray-500">{item.colour||'—'}</td>
+                        <td className="px-3 py-2"><span className={`font-medium ${item.vehicleStatus==='Non-Runner'?'text-red-600':'text-green-600'}`}>{item.vehicleStatus||'—'}</span></td>
                         <td className="px-3 py-2"><span className={`font-medium ${condCls[item.condition]||''}`}>{item.condition||'—'}</span></td>
                       </tr>
                     ))}

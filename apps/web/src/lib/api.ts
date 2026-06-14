@@ -16,8 +16,9 @@ api.interceptors.response.use(
         await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true });
         return api(original);
       } catch {
-        // Refresh failed — redirect to login only if we're not already there
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        // Only redirect to login when the user is inside a protected route.
+        // Public pages (/, /login, etc.) should not be redirected.
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/app')) {
           window.location.href = '/login';
         }
       }
