@@ -2,11 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { AppError } from './errorHandler';
+import { RoleKey } from '../lib/roles';
 
 export interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
+    role: string;
     permissions: Record<string, boolean>;
   };
 }
@@ -35,14 +37,21 @@ export const authenticate = async (
 
     if (!user || !user.isActive) throw new AppError('Not authenticated', 401);
 
+    // Check account lockout
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      throw new AppError(`Account locked. Try again in ${mins} minute${mins !== 1 ? 's' : ''}.`, 403);
+    }
+
     req.user = {
       id: user.id,
       username: user.username,
+      role: user.role,
       permissions: user.permissions
         ? Object.fromEntries(
-            Object.entries(user.permissions).filter(
-              ([k]) => k !== 'id' && k !== 'userId'
-            )
+            Object.entries(user.permissions)
+              .filter(([k]) => k !== 'id' && k !== 'userId')
+              .map(([k, v]) => [k, Boolean(v)])
           )
         : {},
     };
@@ -56,8 +65,20 @@ export const authenticate = async (
 
 export const requirePermission = (permission: string) => {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
+    const role = req.user?.role as RoleKey;
+    // Super admins bypass all permission checks
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN') return next();
     if (!req.user?.permissions[permission]) {
       return next(new AppError('You do not have permission to do this', 403));
+    }
+    next();
+  };
+};
+
+export const requireRole = (...roles: RoleKey[]) => {
+  return (req: AuthRequest, _res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role as RoleKey)) {
+      return next(new AppError('Insufficient role for this action', 403));
     }
     next();
   };

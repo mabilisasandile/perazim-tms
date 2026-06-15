@@ -7,18 +7,48 @@ export const settingsService = {
     if (!s) s = await prisma.settings.create({ data: { companyName: 'Perazim', vat: 15, currency: 'ZAR' } });
     return s;
   },
+
   async update(data: any) {
     const existing = await this.get();
     return prisma.settings.update({ where: { id: existing.id }, data });
   },
+
+  async getSecurityPolicy() {
+    const s = await this.get();
+    return {
+      minPasswordLength:     s.minPasswordLength,
+      requireUppercase:      s.requireUppercase,
+      requireNumbers:        s.requireNumbers,
+      requireSpecialChars:   s.requireSpecialChars,
+      sessionTimeoutMinutes: s.sessionTimeoutMinutes,
+      maxLoginAttempts:      s.maxLoginAttempts,
+      lockoutMinutes:        s.lockoutMinutes,
+    };
+  },
+
+  async updateSecurityPolicy(data: {
+    minPasswordLength?:     number;
+    requireUppercase?:      boolean;
+    requireNumbers?:        boolean;
+    requireSpecialChars?:   boolean;
+    sessionTimeoutMinutes?: number;
+    maxLoginAttempts?:      number;
+    lockoutMinutes?:        number;
+  }) {
+    const existing = await this.get();
+    return prisma.settings.update({ where: { id: existing.id }, data });
+  },
+
   async getSmtp() {
     return prisma.smtpSettings.findFirst();
   },
+
   async updateSmtp(data: any) {
     const existing = await prisma.smtpSettings.findFirst();
     if (existing) return prisma.smtpSettings.update({ where: { id: existing.id }, data });
     return prisma.smtpSettings.create({ data });
   },
+
   async testSmtp() {
     const smtp = await this.getSmtp();
     if (!smtp) throw new Error('SMTP not configured');

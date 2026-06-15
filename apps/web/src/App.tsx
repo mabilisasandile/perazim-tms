@@ -31,6 +31,7 @@ import PaymentsPage       from './pages/payments/PaymentsPage';
 import UsersPage          from './pages/users/UsersPage';
 import SettingsPage       from './pages/settings/SettingsPage';
 import SearchPage         from './pages/search/SearchPage';
+import AuditTrailPage    from './pages/audit-trail/AuditTrailPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user      = useAuthStore((s) => s.user);
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="users/*"          element={<UsersPage />} />
           <Route path="settings/*"       element={<SettingsPage />} />
           <Route path="search"           element={<SearchPage />} />
+          <Route path="audit-trail"     element={<AuditTrailPage />} />
           <Route path="*"                element={<NotFoundPage />} />
         </Route>
       </Routes>

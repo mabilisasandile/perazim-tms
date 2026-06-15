@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, AuthRequest } from '../../middleware/authenticate';
 import { authenticateCustomer, CustomerRequest } from '../../middleware/authenticateCustomer';
 import { customersService } from './customers.service';
 import { createCustomerSchema, updateCustomerSchema } from './customers.schema';
@@ -7,6 +7,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
+import { auditService, getIp } from '../audit-trail/audit.service';
 
 const COOKIE = {
   httpOnly: true,
@@ -209,17 +210,75 @@ router.post('/register', async (req, res, next) => {
 
 router.use(authenticate);
 
-router.get('/',                    async (_req, res, next) => { try { res.json(await customersService.findAll()); }                                                              catch(e) { next(e); } });
-router.get('/:id',                 async (req,  res, next) => { try { res.json(await customersService.findById(+req.params.id)); }                                               catch(e) { next(e); } });
-router.get('/:id/trips',           async (req,  res, next) => { try { res.json(await customersService.getTrips(+req.params.id)); }                                               catch(e) { next(e); } });
-router.post('/',                   async (req,  res, next) => { try { res.status(201).json(await customersService.create(createCustomerSchema.parse(req.body))); }               catch(e) { next(e); } });
-router.put('/:id',                 async (req,  res, next) => { try { res.json(await customersService.update(+req.params.id, updateCustomerSchema.parse(req.body))); }           catch(e) { next(e); } });
-router.delete('/:id',              async (req,  res, next) => { try { await customersService.remove(+req.params.id); res.json({ message: 'Customer deleted' }); }               catch(e) { next(e); } });
-router.put('/:id/portal-password', async (req,  res, next) => {
+// ── Admin-protected customer management ──────────────────────────────────────
+
+router.get('/',        async (_req, res, next) => { try { res.json(await customersService.findAll()); }                 catch(e) { next(e); } });
+router.get('/:id',     async (req,  res, next) => { try { res.json(await customersService.findById(+req.params.id)); }  catch(e) { next(e); } });
+router.get('/:id/trips', async (req, res, next) => { try { res.json(await customersService.getTrips(+req.params.id)); } catch(e) { next(e); } });
+
+router.post('/', async (req: AuthRequest, res, next) => {
   try {
+    const customer = await customersService.create(createCustomerSchema.parse(req.body));
+    res.status(201).json(customer);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'CUSTOMER_CREATED',
+      entityType: 'CUSTOMER',
+      entityId:   customer.id,
+      newValue:   customer,
+    });
+  } catch(e) { next(e); }
+});
+
+router.put('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldCustomer = await customersService.findById(id);
+    const customer = await customersService.update(id, updateCustomerSchema.parse(req.body));
+    res.json(customer);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'CUSTOMER_UPDATED',
+      entityType: 'CUSTOMER',
+      entityId:   id,
+      oldValue:   oldCustomer,
+      newValue:   customer,
+    });
+  } catch(e) { next(e); }
+});
+
+router.delete('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldCustomer = await customersService.findById(id);
+    await customersService.remove(id);
+    res.json({ message: 'Customer deleted' });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'CUSTOMER_DELETED',
+      entityType: 'CUSTOMER',
+      entityId:   id,
+      oldValue:   oldCustomer,
+    });
+  } catch(e) { next(e); }
+});
+
+router.put('/:id/portal-password', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
     const { password } = z.object({ password: z.string().min(8) }).parse(req.body);
-    await customersService.setPortalPassword(+req.params.id, password);
+    await customersService.setPortalPassword(id, password);
     res.json({ message: 'Portal password set' });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'CUSTOMER_PASSWORD_SET',
+      entityType: 'CUSTOMER',
+      entityId:   id,
+    });
   } catch(e) { next(e); }
 });
 

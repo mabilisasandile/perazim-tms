@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Truck, Users, Route, UserCircle,
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
-  ClipboardList, Package, Search
+  ClipboardList, Package, Search, History
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -25,6 +25,7 @@ const navItems = [
   { to: '/app/loadsheets',       icon: Package,         label: 'Load Sheets' },
   { to: '/app/reminders',        icon: Bell,            label: 'Reminders' },
   { to: '/app/users',            icon: ShieldCheck,     label: 'Users' },
+  { to: '/app/audit-trail',      icon: History,         label: 'Audit Trail' },
   { to: '/app/settings',         icon: Settings,        label: 'Settings' },
 ];
 

@@ -15,18 +15,24 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  username  String   @unique
-  password  String // bcrypt hashed
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                Int       @id @default(autoincrement())
+  name              String
+  email             String    @unique
+  username          String    @unique
+  password          String
+  role              String    @default("ADMIN")
+  isActive          Boolean   @default(true)
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   permissions UserPermissions?
   trips       Trip[]           @relation("TripCreatedBy")
 
+  @@index([role])
   @@map("users")
 }
 
@@ -646,7 +652,15 @@ model Settings {
   vat          Float    @default(15)
   currency     String   @default("ZAR")
   googleApiKey String?
-  updatedAt    DateTime @updatedAt
+  // Security policy
+  minPasswordLength     Int     @default(8)
+  requireUppercase      Boolean @default(false)
+  requireNumbers        Boolean @default(false)
+  requireSpecialChars   Boolean @default(false)
+  sessionTimeoutMinutes Int     @default(15)
+  maxLoginAttempts      Int     @default(5)
+  lockoutMinutes        Int     @default(30)
+  updatedAt             DateTime @updatedAt
 
   @@map("settings")
 }
@@ -663,4 +677,26 @@ model SmtpSettings {
   updatedAt DateTime @updatedAt
 
   @@map("smtp_settings")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT TRAIL
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  username   String
+  ipAddress  String?
+  actionType String
+  entityType String
+  entityId   Int?
+  oldValue   Json?
+  newValue   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([username])
+  @@index([actionType])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

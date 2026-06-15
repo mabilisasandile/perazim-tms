@@ -3,10 +3,20 @@ import { api } from '../../lib/api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, AlertCircle, Save, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, Save, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 /* ── types ──────────────────────────────────────────── */
+
+interface SecurityPolicy {
+  minPasswordLength:     number;
+  requireUppercase:      boolean;
+  requireNumbers:        boolean;
+  requireSpecialChars:   boolean;
+  sessionTimeoutMinutes: number;
+  maxLoginAttempts:      number;
+  lockoutMinutes:        number;
+}
 
 interface Settings {
   id: number;
@@ -284,10 +294,121 @@ export default function SettingsPage() {
         </form>
       </SectionCard>
 
+      {/* Security Policy */}
+      <SecurityPolicySection />
+
       {/* Change Password */}
       <SectionCard title="Change Admin Password">
         <ChangePasswordForm />
       </SectionCard>
+    </div>
+  );
+}
+
+/* ── Security Policy section ────────────────────────────── */
+
+function SecurityPolicySection() {
+  const qc = useQueryClient();
+  const [saved, setSaved] = useState(false);
+
+  const securitySchema = z.object({
+    minPasswordLength:     z.coerce.number().int().min(6).max(64),
+    requireUppercase:      z.boolean(),
+    requireNumbers:        z.boolean(),
+    requireSpecialChars:   z.boolean(),
+    sessionTimeoutMinutes: z.coerce.number().int().min(1).max(1440),
+    maxLoginAttempts:      z.coerce.number().int().min(1).max(20),
+    lockoutMinutes:        z.coerce.number().int().min(1).max(1440),
+  });
+  type SecForm = z.infer<typeof securitySchema>;
+
+  const { data, isLoading } = useQuery<SecurityPolicy>({
+    queryKey: ['security-policy'],
+    queryFn:  () => api.get('/settings/security').then(r => r.data),
+  });
+
+  const form = useForm<SecForm>({ resolver: zodResolver(securitySchema) });
+
+  useEffect(() => {
+    if (data) form.reset(data);
+  }, [data]);
+
+  const saveMut = useMutation({
+    mutationFn: (d: SecForm) => api.put('/settings/security', d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['security-policy'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    },
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <div className="bg-white rounded-xl border">
+      <div className="px-6 py-4 border-b flex items-center gap-2">
+        <ShieldCheck size={18} className="text-brand-600" />
+        <h2 className="text-base font-semibold text-gray-900">Security Policy</h2>
+      </div>
+      <form onSubmit={form.handleSubmit(d => saveMut.mutate(d))} className="px-6 py-5 space-y-6">
+
+        {/* Password policy */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-3">Password Requirements</p>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Minimum Password Length">
+              <input type="number" min={6} max={64} {...form.register('minPasswordLength')} className={inputCls} />
+            </Field>
+            <div className="flex flex-col justify-end gap-2 pb-1">
+              {([
+                ['requireUppercase',    'Require uppercase letter'],
+                ['requireNumbers',      'Require a number'],
+                ['requireSpecialChars', 'Require a special character'],
+              ] as const).map(([field, label]) => (
+                <label key={field} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" {...form.register(field)} className="rounded border-gray-300 text-brand-600" />
+                  <span className="text-sm text-gray-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Login restrictions */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-3">Login Restrictions</p>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Max Failed Attempts Before Lockout">
+              <input type="number" min={1} max={20} {...form.register('maxLoginAttempts')} className={inputCls} />
+              <p className="text-xs text-gray-400 mt-1">Accounts are locked after this many consecutive failures.</p>
+            </Field>
+            <Field label="Lockout Duration (minutes)">
+              <input type="number" min={1} {...form.register('lockoutMinutes')} className={inputCls} />
+              <p className="text-xs text-gray-400 mt-1">How long accounts remain locked.</p>
+            </Field>
+          </div>
+        </div>
+
+        {/* Session management */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-3">Session Management</p>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Session Timeout (minutes)">
+              <input type="number" min={1} max={1440} {...form.register('sessionTimeoutMinutes')} className={inputCls} />
+              <p className="text-xs text-gray-400 mt-1">Access tokens expire after this period. Users must log in again.</p>
+            </Field>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2 border-t">
+          <button type="submit" disabled={saveMut.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg disabled:opacity-60">
+            <Save size={15} />{saveMut.isPending ? 'Saving…' : 'Save Security Policy'}
+          </button>
+          {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle2 size={15} /> Saved</span>}
+          {saveMut.isError && <span className="flex items-center gap-1 text-red-600 text-sm"><AlertCircle size={15} /> Failed to save</span>}
+        </div>
+      </form>
     </div>
   );
 }

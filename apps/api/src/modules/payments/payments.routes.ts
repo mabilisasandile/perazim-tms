@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, AuthRequest } from '../../middleware/authenticate';
 import { paymentsService } from './payments.service';
 import { z } from 'zod';
+import { auditService, getIp } from '../audit-trail/audit.service';
 
 /**
  * @swagger
@@ -29,7 +30,8 @@ const statusSchema = z.object({
   reference: z.string().optional(),
 });
 
-router.get('/summary',      async (_req, res, next) => { try { res.json(await paymentsService.getSummary()); }                                                                              catch(e) { next(e); } });
+router.get('/summary', async (_req, res, next) => { try { res.json(await paymentsService.getSummary()); } catch(e) { next(e); } });
+
 router.get('/', async (req, res, next) => {
   try {
     const filters = {
@@ -39,10 +41,77 @@ router.get('/', async (req, res, next) => {
     res.json(await paymentsService.findAll(filters));
   } catch(e) { next(e); }
 });
-router.get('/:id',          async (req,  res, next) => { try { res.json(await paymentsService.findById(+req.params.id)); }                                                                  catch(e) { next(e); } });
-router.post('/',            async (req,  res, next) => { try { res.status(201).json(await paymentsService.create(createSchema.parse(req.body))); }                                          catch(e) { next(e); } });
-router.patch('/:id/mark-paid', async (req, res, next) => { try { const { reference } = markPaidSchema.parse(req.body); res.json(await paymentsService.markPaid(+req.params.id, reference)); } catch(e) { next(e); } });
-router.patch('/:id/status', async (req, res, next) => { try { const { status, reference } = statusSchema.parse(req.body); res.json(await paymentsService.updateStatus(+req.params.id, status, reference)); } catch(e) { next(e); } });
-router.delete('/:id',       async (req,  res, next) => { try { await paymentsService.remove(+req.params.id); res.json({ message: 'Payment deleted' }); }                                   catch(e) { next(e); } });
+
+router.get('/:id', async (req, res, next) => { try { res.json(await paymentsService.findById(+req.params.id)); } catch(e) { next(e); } });
+
+router.post('/', async (req: AuthRequest, res, next) => {
+  try {
+    const payment = await paymentsService.create(createSchema.parse(req.body));
+    res.status(201).json(payment);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'PAYMENT_CREATED',
+      entityType: 'PAYMENT',
+      entityId:   (payment as any)?.id,
+      newValue:   payment,
+    });
+  } catch(e) { next(e); }
+});
+
+router.patch('/:id/mark-paid', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldPayment = await paymentsService.findById(id);
+    const { reference } = markPaidSchema.parse(req.body);
+    const payment = await paymentsService.markPaid(id, reference);
+    res.json(payment);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'PAYMENT_MARKED_PAID',
+      entityType: 'PAYMENT',
+      entityId:   id,
+      oldValue:   { status: oldPayment.status },
+      newValue:   { status: 'paid', reference },
+    });
+  } catch(e) { next(e); }
+});
+
+router.patch('/:id/status', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldPayment = await paymentsService.findById(id);
+    const { status, reference } = statusSchema.parse(req.body);
+    const payment = await paymentsService.updateStatus(id, status, reference);
+    res.json(payment);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'PAYMENT_STATUS_UPDATED',
+      entityType: 'PAYMENT',
+      entityId:   id,
+      oldValue:   { status: oldPayment.status },
+      newValue:   { status, reference },
+    });
+  } catch(e) { next(e); }
+});
+
+router.delete('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldPayment = await paymentsService.findById(id);
+    await paymentsService.remove(id);
+    res.json({ message: 'Payment deleted' });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'PAYMENT_DELETED',
+      entityType: 'PAYMENT',
+      entityId:   id,
+      oldValue:   oldPayment,
+    });
+  } catch(e) { next(e); }
+});
 
 export default router;

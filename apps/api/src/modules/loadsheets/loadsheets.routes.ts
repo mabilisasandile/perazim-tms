@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, AuthRequest } from '../../middleware/authenticate';
 import { loadsheetsService } from './loadsheets.service';
 import { z } from 'zod';
+import { auditService, getIp } from '../audit-trail/audit.service';
 
 /**
  * @swagger
@@ -36,9 +37,56 @@ router.get('/', async (req, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.get('/:id',    async (req, res, next) => { try { res.json(await loadsheetsService.findById(+req.params.id)); }                                               catch(e) { next(e); } });
-router.post('/',      async (req, res, next) => { try { res.status(201).json(await loadsheetsService.create(createSchema.parse(req.body))); }                       catch(e) { next(e); } });
-router.put('/:id',    async (req, res, next) => { try { res.json(await loadsheetsService.update(+req.params.id, updateSchema.parse(req.body))); }                   catch(e) { next(e); } });
-router.delete('/:id', async (req, res, next) => { try { await loadsheetsService.remove(+req.params.id); res.json({ message: 'Load sheet deleted' }); }             catch(e) { next(e); } });
+router.get('/:id', async (req, res, next) => { try { res.json(await loadsheetsService.findById(+req.params.id)); } catch(e) { next(e); } });
+
+router.post('/', async (req: AuthRequest, res, next) => {
+  try {
+    const ls = await loadsheetsService.create(createSchema.parse(req.body) as Parameters<typeof loadsheetsService.create>[0]);
+    res.status(201).json(ls);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'WAREHOUSE_LOADSHEET_CREATED',
+      entityType: 'WAREHOUSE',
+      entityId:   (ls as any)?.id,
+      newValue:   ls,
+    });
+  } catch(e) { next(e); }
+});
+
+router.put('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldLs = await loadsheetsService.findById(id);
+    const ls = await loadsheetsService.update(id, updateSchema.parse(req.body));
+    res.json(ls);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'WAREHOUSE_LOADSHEET_UPDATED',
+      entityType: 'WAREHOUSE',
+      entityId:   id,
+      oldValue:   oldLs,
+      newValue:   ls,
+    });
+  } catch(e) { next(e); }
+});
+
+router.delete('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldLs = await loadsheetsService.findById(id);
+    await loadsheetsService.remove(id);
+    res.json({ message: 'Load sheet deleted' });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'WAREHOUSE_LOADSHEET_DELETED',
+      entityType: 'WAREHOUSE',
+      entityId:   id,
+      oldValue:   oldLs,
+    });
+  } catch(e) { next(e); }
+});
 
 export default router;

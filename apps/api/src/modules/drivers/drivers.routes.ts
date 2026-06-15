@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, AuthRequest } from '../../middleware/authenticate';
 import { authenticateDriver, DriverRequest } from '../../middleware/authenticateDriver';
 import { driversService } from './drivers.service';
 import { createDriverSchema, updateDriverSchema } from './drivers.schema';
@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { auditService, getIp } from '../audit-trail/audit.service';
 
 const router = Router();
 
@@ -149,9 +150,58 @@ router.get('/portal/trips', authenticateDriver, async (req: DriverRequest, res, 
 // ── Admin-protected driver management ────────────────────────────────────────
 
 router.use(authenticate);
-router.get('/',       async (_req, res, next) => { try { res.json(await driversService.findAll()); } catch(e) { next(e); } });
-router.get('/:id',    async (req,  res, next) => { try { res.json(await driversService.findById(+req.params.id)); } catch(e) { next(e); } });
-router.post('/',      async (req,  res, next) => { try { res.status(201).json(await driversService.create(createDriverSchema.parse(req.body))); } catch(e) { next(e); } });
-router.put('/:id',    async (req,  res, next) => { try { res.json(await driversService.update(+req.params.id, updateDriverSchema.parse(req.body))); } catch(e) { next(e); } });
-router.delete('/:id', async (req,  res, next) => { try { await driversService.remove(+req.params.id); res.json({ message: 'Driver deleted' }); } catch(e) { next(e); } });
+
+router.get('/',    async (_req, res, next) => { try { res.json(await driversService.findAll()); }           catch(e) { next(e); } });
+router.get('/:id', async (req,  res, next) => { try { res.json(await driversService.findById(+req.params.id)); } catch(e) { next(e); } });
+
+router.post('/', async (req: AuthRequest, res, next) => {
+  try {
+    const driver = await driversService.create(createDriverSchema.parse(req.body));
+    res.status(201).json(driver);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'DRIVER_CREATED',
+      entityType: 'DRIVER',
+      entityId:   driver.id,
+      newValue:   driver,
+    });
+  } catch(e) { next(e); }
+});
+
+router.put('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldDriver = await driversService.findById(id);
+    const driver = await driversService.update(id, updateDriverSchema.parse(req.body));
+    res.json(driver);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'DRIVER_UPDATED',
+      entityType: 'DRIVER',
+      entityId:   id,
+      oldValue:   oldDriver,
+      newValue:   driver,
+    });
+  } catch(e) { next(e); }
+});
+
+router.delete('/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const oldDriver = await driversService.findById(id);
+    await driversService.remove(id);
+    res.json({ message: 'Driver deleted' });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'DRIVER_DELETED',
+      entityType: 'DRIVER',
+      entityId:   id,
+      oldValue:   oldDriver,
+    });
+  } catch(e) { next(e); }
+});
+
 export default router;

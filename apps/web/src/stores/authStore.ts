@@ -7,6 +7,9 @@ interface User {
   name: string;
   email: string;
   username: string;
+  role: string;
+  lastLoginAt: string | null;
+  lockedUntil: string | null;
   permissions: Record<string, boolean>;
 }
 
@@ -17,6 +20,7 @@ interface AuthState {
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
+  hasRole: (...roles: string[]) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -59,7 +63,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       hasPermission: (permission) => {
+        const role = get().user?.role;
+        if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true;
         return get().user?.permissions[permission] ?? false;
+      },
+
+      hasRole: (...roles) => {
+        const role = get().user?.role;
+        return role ? roles.includes(role) : false;
       },
     }),
     {
