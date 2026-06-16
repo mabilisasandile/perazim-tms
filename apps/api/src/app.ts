@@ -34,6 +34,7 @@ import searchRoutes        from './modules/search/search.routes';
 import auditRoutes         from './modules/audit-trail/audit.routes';
 import warehouseRoutes     from './modules/warehouses/warehouses.routes';
 import gateScanRoutes      from './modules/gate-scans/gate-scans.routes';
+import podRoutes           from './modules/pod/pod.routes';
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use(`${v1}/search`,         searchRoutes);
 app.use(`${v1}/audit-trail`,    auditRoutes);
 app.use(`${v1}/warehouses`,     warehouseRoutes);
 app.use(`${v1}/gate-scans`,    gateScanRoutes);
+app.use(`${v1}/pod`,           podRoutes);
 
 // ─── Error Handling ───────────────────────────────────────
 app.use(notFound);

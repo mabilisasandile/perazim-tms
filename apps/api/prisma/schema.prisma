@@ -290,6 +290,7 @@ model Trip {
   positions        Position[]
   warehouseVehicle WarehouseVehicle?
   gateScans        GateScan[]
+  proofOfDelivery  ProofOfDelivery?
 
   @@map("trips")
 }
@@ -809,4 +810,48 @@ model GateScan {
   @@index([scanType])
   @@index([scannedAt])
   @@map("gate_scans")
+}
+
+// ─────────────────────────────────────────────
+// PROOF OF DELIVERY
+// ─────────────────────────────────────────────
+
+model ProofOfDelivery {
+  id          Int      @id @default(autoincrement())
+  tripId      Int      @unique
+  trip        Trip     @relation(fields: [tripId], references: [id])
+
+  // Receiver Information
+  receiverFirstName   String
+  receiverLastName    String
+  receiverPhone       String
+  receiverEmail       String?
+  receiverIdNumber    String?
+  relationshipToOwner String?
+
+  // Delivery Verification
+  signature       String   @db.LongText
+  gpsLatitude     Float?
+  gpsLongitude    Float?
+  gpsAccuracy     Float?
+  deliveredAt     DateTime @default(now())
+  notes           String?  @db.Text
+
+  photos    PodPhoto[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("proofs_of_delivery")
+}
+
+model PodPhoto {
+  id        Int             @id @default(autoincrement())
+  podId     Int
+  pod       ProofOfDelivery @relation(fields: [podId], references: [id], onDelete: Cascade)
+  filename  String
+  path      String
+  createdAt DateTime        @default(now())
+
+  @@map("pod_photos")
 }
