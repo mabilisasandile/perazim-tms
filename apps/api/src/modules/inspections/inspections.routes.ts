@@ -31,15 +31,22 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = /jpeg|jpg|png|webp/;
     const ok = allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype);
-    cb(ok ? null : new Error('Only image files are allowed'), ok);
+    if (ok) cb(null, true); else cb(new Error('Only image files are allowed') as any, false);
   },
 });
 
 const createSchema = z.object({
-  tripId:    z.coerce.number().int().positive(),
-  driverId:  z.coerce.number().int().positive(),
-  data:      z.any(),
-  remarks:   z.string().optional(),
+  tripId:           z.coerce.number().int().positive(),
+  driverId:         z.coerce.number().int().positive(),
+  stage:            z.enum(['COLLECTION', 'WAREHOUSE', 'HANDOVER', 'DELIVERY']).default('COLLECTION'),
+  data:             z.any().default({}),
+  remarks:          z.string().optional(),
+  odometerReading:  z.coerce.number().optional(),
+  fuelLevel:        z.coerce.number().int().min(0).max(100).optional(),
+  damageNotes:      z.string().optional(),
+  driverSignature:  z.string().optional(),
+  receiverName:     z.string().optional(),
+  receiverSignature: z.string().optional(),
 });
 
 const router = Router();
@@ -62,6 +69,7 @@ router.get('/', async (req, res, next) => {
     const filters = {
       tripId:   req.query.tripId   ? +req.query.tripId   : undefined,
       driverId: req.query.driverId ? +req.query.driverId : undefined,
+      stage:    req.query.stage    as string | undefined,
     };
     res.json(await inspectionsService.findAll(filters));
   } catch(e) { next(e); }

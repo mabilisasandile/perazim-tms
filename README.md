@@ -105,6 +105,9 @@ cp apps/api/.env.example apps/api/.env
 
 ### 3. Set up the database
 
+<!-- Database -->
+DATABASE_URL="mysql://user:password123@localhost:3306/perazim_db"
+
 ```bash
 # Run migrations (creates all tables)
 npm run db:migrate

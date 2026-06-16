@@ -11,6 +11,7 @@ import DriverSignupPage    from './pages/driver/DriverSignupPage';
 import DriverLoginPage     from './pages/driver/DriverLoginPage';
 
 import HomePage        from './pages/public/HomePage';
+import TrackingPage    from './pages/public/TrackingPage';
 import LoginPage       from './pages/auth/LoginPage';
 import NotFoundPage    from './pages/NotFoundPage';
 
@@ -26,6 +27,8 @@ import FuelPage           from './pages/fuel/FuelPage';
 import IncomeExpensesPage from './pages/income-expenses/IncomeExpensesPage';
 import RemindersPage      from './pages/reminders/RemindersPage';
 import InspectionsPage    from './pages/inspections/InspectionsPage';
+import WarehousesPage     from './pages/warehouses/WarehousesPage';
+import GateScansPage      from './pages/gate-scans/GateScansPage';
 import LoadsheetsPage     from './pages/loadsheets/LoadsheetsPage';
 import PaymentsPage       from './pages/payments/PaymentsPage';
 import UsersPage          from './pages/users/UsersPage';
@@ -81,6 +84,7 @@ export default function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/track/:code" element={<TrackingPage />} />
 
         {/* Customer portal */}
         <Route path="/customer" element={<CustomerRoute><CustomerPortalPage /></CustomerRoute>} />
@@ -104,6 +108,8 @@ export default function App() {
           <Route path="income-expenses/*" element={<IncomeExpensesPage />} />
           <Route path="reminders/*"      element={<RemindersPage />} />
           <Route path="inspections/*"    element={<InspectionsPage />} />
+          <Route path="warehouses/*"     element={<WarehousesPage />} />
+          <Route path="gate-scans/*"     element={<GateScansPage />} />
           <Route path="loadsheets/*"     element={<LoadsheetsPage />} />
           <Route path="payments/*"       element={<PaymentsPage />} />
           <Route path="users/*"          element={<UsersPage />} />

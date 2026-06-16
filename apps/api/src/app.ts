@@ -32,6 +32,8 @@ import positionRoutes      from './modules/positions/positions.routes';
 import incomeExpenseRoutes from './modules/income-expenses/income-expenses.routes';
 import searchRoutes        from './modules/search/search.routes';
 import auditRoutes         from './modules/audit-trail/audit.routes';
+import warehouseRoutes     from './modules/warehouses/warehouses.routes';
+import gateScanRoutes      from './modules/gate-scans/gate-scans.routes';
 
 const app = express();
 
@@ -82,6 +84,8 @@ app.use(`${v1}/positions`,      positionRoutes);
 app.use(`${v1}/income-expenses`, incomeExpenseRoutes);
 app.use(`${v1}/search`,         searchRoutes);
 app.use(`${v1}/audit-trail`,    auditRoutes);
+app.use(`${v1}/warehouses`,     warehouseRoutes);
+app.use(`${v1}/gate-scans`,    gateScanRoutes);
 
 // ─── Error Handling ───────────────────────────────────────
 app.use(notFound);

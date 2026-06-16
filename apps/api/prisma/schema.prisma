@@ -288,6 +288,8 @@ model Trip {
   inspections      Inspection[]
   inspectionImages InspectionImage[]
   positions        Position[]
+  warehouseVehicle WarehouseVehicle?
+  gateScans        GateScan[]
 
   @@map("trips")
 }
@@ -559,13 +561,29 @@ model Inspection {
   trip      Trip     @relation(fields: [tripId], references: [id])
   driverId  Int
   driver    Driver   @relation(fields: [driverId], references: [id])
-  data      Json // { itemId: pass|fail|na, ... }
+  // COLLECTION | WAREHOUSE | HANDOVER | DELIVERY
+  stage     String   @default("COLLECTION")
+  data      Json     // { itemId: pass|fail|na, ... }
   remarks   String?  @db.Text
+
+  // Vehicle condition metrics
+  odometerReading  Float?
+  fuelLevel        Int?    // 0-100 percentage
+
+  // Damage
+  damageNotes      String? @db.Text
+
+  // Signatures (base64 PNG)
+  driverSignature   String? @db.LongText
+  receiverName      String?
+  receiverSignature String? @db.LongText
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   images InspectionImage[]
 
+  @@index([stage])
   @@map("inspections")
 }
 
@@ -699,4 +717,96 @@ model AuditLog {
   @@index([entityType])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────
+// WAREHOUSE MANAGEMENT
+// ─────────────────────────────────────────────
+
+model Warehouse {
+  id           Int      @id @default(autoincrement())
+  name         String
+  location     String
+  capacity     Int      // max vehicle slots
+  contactName  String?
+  contactPhone String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicles      WarehouseVehicle[]
+  transfersFrom WarehouseTransfer[] @relation("TransferFromWarehouse")
+  transfersTo   WarehouseTransfer[] @relation("TransferToWarehouse")
+
+  @@map("warehouses")
+}
+
+model WarehouseVehicle {
+  id           Int       @id @default(autoincrement())
+  warehouseId  Int
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  tripId       Int       @unique
+  trip         Trip      @relation(fields: [tripId], references: [id])
+  // IN_STORAGE | AWAITING_DISPATCH | DISPATCHED
+  status       String    @default("IN_STORAGE")
+  arrivedAt    DateTime  @default(now())
+  dispatchedAt DateTime?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  transfers WarehouseTransfer[]
+
+  @@map("warehouse_vehicles")
+}
+
+model WarehouseTransfer {
+  id                 Int              @id @default(autoincrement())
+  warehouseVehicleId Int
+  warehouseVehicle   WarehouseVehicle @relation(fields: [warehouseVehicleId], references: [id])
+  fromWarehouseId    Int
+  fromWarehouse      Warehouse        @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouseId      Int
+  toWarehouse        Warehouse        @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
+  transferredAt      DateTime         @default(now())
+  notes              String?          @db.Text
+
+  @@map("warehouse_transfers")
+}
+
+// ─────────────────────────────────────────────
+// SECURITY GATE SCANNING
+// ─────────────────────────────────────────────
+
+model GateScan {
+  id            Int      @id @default(autoincrement())
+  // ENTRY | EXIT
+  scanType      String
+  trackingCode  String
+  tripId        Int?
+  trip          Trip?    @relation(fields: [tripId], references: [id])
+
+  // Driver at the gate
+  driverName    String?
+  driverLicense String?
+  driverPhone   String?
+
+  // Transport / tow truck
+  towTruckReg   String?
+  towTruckDriver String?
+
+  // Security officer (exit)
+  officerName   String?
+  isApproved    Boolean  @default(false)
+
+  // Gate location
+  gateName      String?
+
+  scannedAt     DateTime @default(now())
+  notes         String?  @db.Text
+
+  @@index([trackingCode])
+  @@index([scanType])
+  @@index([scannedAt])
+  @@map("gate_scans")
 }

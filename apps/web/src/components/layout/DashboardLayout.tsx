@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Truck, Users, Route, UserCircle,
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
-  ClipboardList, Package, Search, History
+  ClipboardList, Package, Search, History, Building2, ScanLine
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -22,6 +22,8 @@ const navItems = [
   { to: '/app/fuel',             icon: Fuel,            label: 'Fuel' },
   { to: '/app/income-expenses',  icon: TrendingUp,      label: 'Income & Expenses' },
   { to: '/app/inspections',      icon: ClipboardList,   label: 'Inspections' },
+  { to: '/app/warehouses',       icon: Building2,       label: 'Warehouses' },
+  { to: '/app/gate-scans',      icon: ScanLine,        label: 'Gate Scanning' },
   { to: '/app/loadsheets',       icon: Package,         label: 'Load Sheets' },
   { to: '/app/reminders',        icon: Bell,            label: 'Reminders' },
   { to: '/app/users',            icon: ShieldCheck,     label: 'Users' },

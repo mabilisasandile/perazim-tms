@@ -41,15 +41,22 @@ export const inspectionsService = {
     return prisma.inspectionItem.delete({ where: { id } });
   },
 
-  async findAll(filters: { tripId?: number; driverId?: number }) {
+  async findAll(filters: { tripId?: number; driverId?: number; stage?: string }) {
     return prisma.inspection.findMany({
       where: {
         ...(filters.tripId   ? { tripId:   filters.tripId   } : {}),
         ...(filters.driverId ? { driverId: filters.driverId } : {}),
+        ...(filters.stage    ? { stage:    filters.stage    } : {}),
       },
       include: {
         driver: { select: { id: true, name: true } },
-        trip:   { select: { id: true, trackingCode: true, fromLocation: true, toLocation: true } },
+        trip: {
+          select: {
+            id: true, trackingCode: true, fromLocation: true, toLocation: true,
+            customerVehicleRegistration: true,
+            customer: { select: { name: true } },
+          },
+        },
         images: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -69,14 +76,29 @@ export const inspectionsService = {
     return insp;
   },
 
-  async create(data: { tripId: number; driverId: number; data: any; remarks?: string }) {
+  async create(data: {
+    tripId: number; driverId: number; data?: any; remarks?: string;
+    stage?: string;
+    odometerReading?: number; fuelLevel?: number;
+    damageNotes?: string;
+    driverSignature?: string; receiverName?: string; receiverSignature?: string;
+  }) {
     return prisma.inspection.create({
-      data,
-      include: { driver: { select: { name: true } }, images: true },
+      data: { ...data, data: data.data ?? {} },
+      include: {
+        driver: { select: { name: true } },
+        trip:   { select: { id: true, trackingCode: true, fromLocation: true, toLocation: true, customerVehicleRegistration: true, customer: { select: { name: true } } } },
+        images: true,
+      },
     });
   },
 
-  async update(id: number, data: { data?: any; remarks?: string }) {
+  async update(id: number, data: {
+    data?: any; remarks?: string; stage?: string;
+    odometerReading?: number; fuelLevel?: number;
+    damageNotes?: string;
+    driverSignature?: string; receiverName?: string; receiverSignature?: string;
+  }) {
     await this.findById(id);
     return prisma.inspection.update({ where: { id }, data, include: { images: true } });
   },

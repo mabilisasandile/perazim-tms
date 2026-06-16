@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon, QrCode } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import QRCodeModal from '../../components/ui/QRCodeModal';
 import { format } from 'date-fns';
 
 interface Trip {
@@ -19,6 +20,12 @@ interface Trip {
   endDate: string | null;
   totalAmount: number | null;
   vehicleCondition: 'Runner' | 'Non-Runner' | null;
+  customerVehicleMake: string | null;
+  customerVehicleColour: string | null;
+  customerVehicleRegistration: string | null;
+  customerVehicleVin: string | null;
+  customerVehicleEngine: string | null;
+  customerVehicleStock: string | null;
   customer: { id: number; name: string };
   vehicle: { id: number; name: string; registrationNo: string };
   driver: { id: number; name: string };
@@ -58,6 +65,7 @@ export default function TripsPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
+  const [qrTrip, setQrTrip] = useState<Trip | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
 
   const { data: trips = [], isLoading, isError } = useQuery<Trip[]>({
@@ -166,6 +174,7 @@ export default function TripsPage() {
                     <td className="px-4 py-3"><Badge label={sm.label} variant={sm.variant} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => setQrTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600" title="View QR Code"><QrCode size={15} /></button>
                         <button onClick={() => setViewTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={15} /></button>
                         {t.status === 'PENDING' && (
                           <button onClick={() => statusMut.mutate({ id: t.id, status: 'IN_PROGRESS' })} className="p-1.5 text-gray-400 hover:text-blue-600" title="Start trip"><TruckIcon size={15} /></button>
@@ -282,6 +291,9 @@ export default function TripsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* QR Code Modal */}
+      {qrTrip && <QRCodeModal trip={qrTrip} onClose={() => setQrTrip(null)} />}
 
       {/* View Trip Modal */}
       {viewTrip && (

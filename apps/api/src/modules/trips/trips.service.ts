@@ -41,6 +41,7 @@ export const tripsService = {
     const trip = await prisma.trip.findUnique({
       where: { trackingCode: code },
       include: {
+        customer: { select: { name: true, phone: true } },
         vehicle: { select: { name: true, registrationNo: true } },
         driver: { select: { name: true, mobile: true } },
         legs: { orderBy: { order: 'asc' } },

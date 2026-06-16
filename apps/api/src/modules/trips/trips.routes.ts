@@ -10,6 +10,9 @@ import { authenticate } from '../../middleware/authenticate';
  */
 const router = Router();
 
+// Public — no auth required (QR code scans)
+router.get('/track/:code', tripsController.tracking);
+
 router.use(authenticate);
 
 /**
@@ -33,7 +36,6 @@ router.use(authenticate);
  *         description: Array of trips
  */
 router.get('/', tripsController.list);
-router.get('/track/:code', tripsController.tracking); // public tracking (auth optional)
 router.get('/:id', tripsController.get);
 router.post('/', tripsController.create);
 router.put('/:id', tripsController.update);
