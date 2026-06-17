@@ -266,6 +266,26 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
+router.patch('/:id/pay-later', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const { approved } = z.object({ approved: z.boolean() }).parse(req.body);
+    const customer = await prisma.customer.update({
+      where: { id },
+      data: { payLaterApproved: approved },
+    });
+    res.json({ id: customer.id, payLaterApproved: customer.payLaterApproved });
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: approved ? 'CUSTOMER_PAY_LATER_APPROVED' : 'CUSTOMER_PAY_LATER_REVOKED',
+      entityType: 'CUSTOMER',
+      entityId:   id,
+      newValue:   { payLaterApproved: approved },
+    });
+  } catch (e) { next(e); }
+});
+
 router.put('/:id/portal-password', async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;

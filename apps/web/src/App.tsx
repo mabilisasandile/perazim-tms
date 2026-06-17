@@ -36,8 +36,11 @@ import PaymentsPage       from './pages/payments/PaymentsPage';
 import UsersPage          from './pages/users/UsersPage';
 import SettingsPage       from './pages/settings/SettingsPage';
 import SearchPage         from './pages/search/SearchPage';
-import AuditTrailPage    from './pages/audit-trail/AuditTrailPage';
-import PayrollPage       from './pages/payroll/PayrollPage';
+import AuditTrailPage       from './pages/audit-trail/AuditTrailPage';
+import PayrollPage          from './pages/payroll/PayrollPage';
+import NotificationsPage    from './pages/notifications/NotificationsPage';
+import ReportingPage        from './pages/reporting/ReportingPage';
+import FuelTankerPage       from './pages/fuel-tanker/FuelTankerPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user      = useAuthStore((s) => s.user);
@@ -122,6 +125,9 @@ export default function App() {
           <Route path="search"           element={<SearchPage />} />
           <Route path="audit-trail"     element={<AuditTrailPage />} />
           <Route path="payroll/*"        element={<PayrollPage />} />
+          <Route path="notifications"    element={<NotificationsPage />} />
+          <Route path="reporting"        element={<ReportingPage />} />
+          <Route path="fuel-tanker"      element={<FuelTankerPage />} />
           <Route path="*"                element={<NotFoundPage />} />
         </Route>
       </Routes>

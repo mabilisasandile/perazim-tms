@@ -87,19 +87,21 @@ model UserPermissions {
 // ─────────────────────────────────────────────
 
 model Customer {
-  id         Int      @id @default(autoincrement())
-  name       String
-  email      String   @unique
-  phone      String?
-  address    String?  @db.Text
-  password   String? // bcrypt hashed — for customer portal login
-  resetToken String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  name             String
+  email            String   @unique
+  phone            String?
+  address          String?  @db.Text
+  password         String? // bcrypt hashed — for customer portal login
+  resetToken       String?
+  isActive         Boolean  @default(true)
+  payLaterApproved Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   trips      Trip[]
   quotations Quotation[]
+  invoices   Invoice[]
 
   @@map("customers")
 }
@@ -300,6 +302,7 @@ model Trip {
   deliveryOtp         DeliveryOtp?
   customerCollection  CustomerCollection?
   payrollLinks        PayrollTripLink[]
+  invoices            Invoice[]
 
   @@map("trips")
 }
@@ -406,10 +409,16 @@ model Invoice {
   id                 Int       @id @default(autoincrement())
   number             String    @unique
   customerId         Int
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  tripId             Int?
+  trip               Trip?     @relation(fields: [tripId], references: [id])
   amount             Decimal   @db.Decimal(10, 2)
   vatAmount          Decimal   @db.Decimal(10, 2)
   total              Decimal   @db.Decimal(10, 2)
-  status             String    @default("unpaid") // unpaid | paid | overdue
+  depositRequired    Decimal?  @db.Decimal(10, 2)
+  depositPaid        Decimal   @default(0) @db.Decimal(10, 2)
+  amountPaid         Decimal   @default(0) @db.Decimal(10, 2)
+  status             String    @default("unpaid") // unpaid | partial | paid | overdue
   dueDate            DateTime?
   paidAt             DateTime?
   notes              String?   @db.Text
@@ -418,7 +427,40 @@ model Invoice {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  items    InvoiceItem[]
+  payments InvoicePayment[]
+
   @@map("invoices")
+}
+
+model InvoiceItem {
+  id               Int     @id @default(autoincrement())
+  invoiceId        Int
+  invoice          Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description      String
+  vehicleCondition String?
+  quantity         Int     @default(1)
+  unitPrice        Decimal @db.Decimal(10, 2)
+  total            Decimal @db.Decimal(10, 2)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  type      String   @default("PAYMENT") // DEPOSIT | PAYMENT
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String   @default("manual") // payfast | manual | eft | cash
+  reference String?
+  proofPath String?
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("invoice_payments")
 }
 
 // ─────────────────────────────────────────────
@@ -1099,4 +1141,165 @@ model PayrollTripLink {
   @@unique([payrollEntryId, tripId])
   @@index([payrollEntryId])
   @@map("payroll_trip_links")
+}
+
+// ─────────────────────────────────────────────
+// FUEL TANKER DIVISION
+// ─────────────────────────────────────────────
+
+enum FuelProductType {
+  DIESEL
+  PETROL
+  PARAFFIN
+}
+
+model FuelTanker {
+  id             Int      @id @default(autoincrement())
+  name           String
+  registrationNo String   @unique
+  totalCapacity  Float
+  isActive       Boolean  @default(true)
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  compartments TankerCompartment[]
+  deliveries   TankerDelivery[]
+  loads        TankerLoad[]
+
+  @@map("fuel_tankers")
+}
+
+model TankerCompartment {
+  id            Int             @id @default(autoincrement())
+  tankerId      Int
+  tanker        FuelTanker      @relation(fields: [tankerId], references: [id], onDelete: Cascade)
+  compartmentNo Int
+  capacity      Float
+  fuelType      FuelProductType
+  currentVolume Float           @default(0)
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([tankerId, compartmentNo])
+  @@map("tanker_compartments")
+}
+
+model TankerDelivery {
+  id          Int        @id @default(autoincrement())
+  reference   String     @unique
+  tankerId    Int
+  tanker      FuelTanker @relation(fields: [tankerId], references: [id])
+  driverName  String?
+  // PLANNED | LOADING | IN_TRANSIT | COMPLETED | CANCELLED
+  status      String     @default("PLANNED")
+  plannedDate DateTime
+  departedAt  DateTime?
+  completedAt DateTime?
+  notes       String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  stops TankerDeliveryStop[]
+
+  @@map("tanker_deliveries")
+}
+
+model TankerDeliveryStop {
+  id              Int             @id @default(autoincrement())
+  deliveryId      Int
+  delivery        TankerDelivery  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  order           Int             @default(1)
+  customerName    String
+  address         String
+  fuelType        FuelProductType
+  plannedVolume   Float
+  deliveredVolume Float           @default(0)
+  // PENDING | DELIVERED | SKIPPED
+  status          String          @default("PENDING")
+  deliveredAt     DateTime?
+  notes           String?         @db.Text
+
+  @@map("tanker_delivery_stops")
+}
+
+model TankerLoad {
+  id            Int             @id @default(autoincrement())
+  tankerId      Int
+  tanker        FuelTanker      @relation(fields: [tankerId], references: [id])
+  fuelType      FuelProductType
+  volume        Float
+  pricePerLitre Decimal         @db.Decimal(10, 4)
+  totalCost     Decimal         @db.Decimal(10, 2)
+  depotName     String
+  driverName    String?
+  loadDate      DateTime
+  notes         String?         @db.Text
+  createdAt     DateTime        @default(now())
+
+  @@map("tanker_loads")
+}
+
+// ─── Notification System ───────────────────────────────────────────────────────
+
+model NotificationSetting {
+  id               Int      @id @default(autoincrement())
+  // BOOKING_UPDATE | DELIVERY_UPDATE | INVOICE_NOTIFICATION | OTP_NOTIFICATION
+  // | TRIP_ALLOCATION | DISPATCH_ASSIGNMENT | SCHEDULE_CHANGE
+  notificationType String   @unique
+  emailEnabled     Boolean  @default(false)
+  smsEnabled       Boolean  @default(false)
+  whatsappEnabled  Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+
+  @@map("notification_settings")
+}
+
+model TwilioConfig {
+  id           Int      @id @default(autoincrement())
+  accountSid   String
+  authToken    String
+  fromPhone    String
+  whatsappFrom String?  // e.g. whatsapp:+14155238886 — enables Twilio WhatsApp
+  enabled      Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  @@map("twilio_config")
+}
+
+model WhatsAppConfig {
+  id            Int      @id @default(autoincrement())
+  phoneNumberId String   // Meta phone number ID
+  accessToken   String   // Meta permanent access token
+  enabled       Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  @@map("whatsapp_config")
+}
+
+model Notification {
+  id             Int      @id @default(autoincrement())
+  // BOOKING_UPDATE | DELIVERY_UPDATE | INVOICE_NOTIFICATION | OTP_NOTIFICATION
+  // | TRIP_ALLOCATION | DISPATCH_ASSIGNMENT | SCHEDULE_CHANGE
+  type           String
+  channel        String   // EMAIL | SMS | WHATSAPP
+  recipientType  String   // CUSTOMER | DRIVER
+  recipientName  String?
+  recipientEmail String?
+  recipientPhone String?
+  entityType     String   // TRIP | INVOICE
+  entityId       Int
+  subject        String?
+  body           String   @db.Text
+  status         String   @default("PENDING") // PENDING | SENT | FAILED
+  sentAt         DateTime?
+  failureReason  String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([type])
+  @@index([channel])
+  @@index([status])
+  @@index([entityType, entityId])
+  @@map("notifications")
 }

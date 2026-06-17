@@ -3,6 +3,8 @@ import { AppError } from '../../middleware/errorHandler';
 import { CreateTripDto, UpdateTripDto } from './trips.schema';
 import { TripStatus } from '@prisma/client';
 import { otpService } from '../otp/otp.service';
+import { notificationService } from '../notifications/notification.service';
+import { invoicesService } from '../invoices/invoices.service';
 
 export const tripsService = {
   async findAll(filters?: { vehicleId?: number; driverId?: number; status?: TripStatus }) {
@@ -64,7 +66,7 @@ export const tripsService = {
 
     const { startDate, endDate, ...restTripData } = tripData;
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const trip = await tx.trip.create({
         data: {
           ...restTripData,
@@ -76,7 +78,6 @@ export const tripsService = {
         },
       });
 
-      // Create legs
       const legsToCreate = legs?.length
         ? legs.map((leg, i) => ({ ...leg, tripId: trip.id, order: i + 1, status: 'pending' }))
         : [{
@@ -91,24 +92,45 @@ export const tripsService = {
 
       await tx.tripLeg.createMany({ data: legsToCreate });
 
-      return tx.trip.findUnique({
-        where: { id: trip.id },
-        include: { legs: true },
-      });
+      return tx.trip.findUnique({ where: { id: trip.id }, include: { legs: true } });
     });
+
+    // Fire-and-forget notifications after transaction completes
+    if (result) {
+      prisma.trip.findUnique({
+        where: { id: result.id },
+        include: { customer: true, driver: true },
+      }).then(fullTrip => {
+        if (!fullTrip) return;
+        notificationService.dispatch('BOOKING_UPDATE', { trip: fullTrip }).catch(() => {});
+        if (fullTrip.driverId) {
+          notificationService.dispatch('TRIP_ALLOCATION', { trip: fullTrip }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
+    return result;
   },
 
   async update(id: number, data: UpdateTripDto) {
     await this.findById(id);
-    return prisma.trip.update({
-      where: { id },
-      data,
-    });
+    const updated = await prisma.trip.update({ where: { id }, data: data as any });
+    if (updated.driverId) {
+      prisma.trip.findUnique({
+        where: { id },
+        include: { driver: true, customer: true },
+      }).then(fullTrip => {
+        if (fullTrip) notificationService.dispatch('SCHEDULE_CHANGE', { trip: fullTrip }).catch(() => {});
+      }).catch(() => {});
+    }
+    return updated;
   },
 
   async updateStatus(id: number, status: TripStatus) {
-    await this.findById(id);
+    const trip = await this.findById(id);
+
     if (status === 'COMPLETED') {
+      // Require OTP authorisation
       const authorised = await otpService.isAuthorised(id);
       if (!authorised) {
         throw new AppError(
@@ -116,8 +138,40 @@ export const tripsService = {
           403,
         );
       }
+
+      // Block closure if a linked invoice is still outstanding and customer is not pay-later approved
+      const customer = await prisma.customer.findUnique({
+        where: { id: trip.customerId },
+        select: { payLaterApproved: true },
+      });
+      if (!customer?.payLaterApproved) {
+        const hasOutstanding = await invoicesService.hasOutstandingInvoice(id);
+        if (hasOutstanding) {
+          throw new AppError(
+            'This trip has an outstanding invoice. Settle the invoice or enable Pay-Later on the customer account before closing the trip.',
+            402,
+          );
+        }
+      }
     }
-    return prisma.trip.update({ where: { id }, data: { status } });
+
+    const updated = await prisma.trip.update({ where: { id }, data: { status } });
+
+    // Fire-and-forget notifications
+    prisma.trip.findUnique({
+      where: { id },
+      include: { customer: true, driver: true },
+    }).then(fullTrip => {
+      if (!fullTrip) return;
+      if (status === 'IN_PROGRESS' || status === 'COMPLETED') {
+        notificationService.dispatch('DELIVERY_UPDATE', { trip: fullTrip, newStatus: status }).catch(() => {});
+      }
+      if (status === 'IN_PROGRESS' && fullTrip.driverId) {
+        notificationService.dispatch('DISPATCH_ASSIGNMENT', { trip: fullTrip }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    return updated;
   },
 
   async remove(id: number) {

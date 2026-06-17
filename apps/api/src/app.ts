@@ -37,8 +37,10 @@ import gateScanRoutes      from './modules/gate-scans/gate-scans.routes';
 import podRoutes           from './modules/pod/pod.routes';
 import otpRoutes           from './modules/otp/otp.routes';
 import collectionRoutes    from './modules/collections/collections.routes';
-import driverDocsRoutes   from './modules/driver-docs/driver-docs.routes';
-import payrollRoutes      from './modules/payroll/payroll.routes';
+import driverDocsRoutes      from './modules/driver-docs/driver-docs.routes';
+import payrollRoutes         from './modules/payroll/payroll.routes';
+import notificationRoutes    from './modules/notifications/notification.routes';
+import fuelTankerRoutes      from './modules/fuel-tanker/fuel-tanker.routes';
 
 const app = express();
 
@@ -94,8 +96,10 @@ app.use(`${v1}/gate-scans`,    gateScanRoutes);
 app.use(`${v1}/pod`,           podRoutes);
 app.use(`${v1}/otp`,           otpRoutes);
 app.use(`${v1}/collections`,   collectionRoutes);
-app.use(`${v1}/driver-docs`,  driverDocsRoutes);
-app.use(`${v1}/payroll`,      payrollRoutes);
+app.use(`${v1}/driver-docs`,     driverDocsRoutes);
+app.use(`${v1}/payroll`,         payrollRoutes);
+app.use(`${v1}/notifications`,   notificationRoutes);
+app.use(`${v1}/fuel-tanker`,     fuelTankerRoutes);
 
 // ─── Error Handling ───────────────────────────────────────
 app.use(notFound);

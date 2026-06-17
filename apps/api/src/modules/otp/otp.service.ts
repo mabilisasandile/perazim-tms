@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { settingsService } from '../settings/settings.service';
+import { notificationService } from '../notifications/notification.service';
 
 const OTP_EXPIRY_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
@@ -11,7 +12,7 @@ export const otpService = {
   async send(tripId: number) {
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
-      include: { customer: { select: { name: true, email: true } } },
+      include: { customer: { select: { name: true, email: true, phone: true } } },
     });
     if (!trip) throw new AppError('Trip not found', 404);
     if (trip.status === 'COMPLETED') throw new AppError('Trip is already completed', 400);
@@ -43,6 +44,10 @@ export const otpService = {
     });
 
     await this.sendEmail(trip.customer.email, trip.customer.name, code, trip.trackingCode);
+    // Also send via SMS/WhatsApp if configured (fire-and-forget; email already sent above)
+    notificationService.dispatchOtpChannels(
+      (trip.customer as any).phone ?? null, code, trip.trackingCode, tripId,
+    ).catch(() => {});
 
     return { sentTo: trip.customer.email, expiresAt };
   },
