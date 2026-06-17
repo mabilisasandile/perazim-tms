@@ -209,6 +209,10 @@ model Driver {
   driverExpenses   DriverExpense[]
   inspections      Inspection[]
   inspectionImages InspectionImage[]
+  documents        DriverDocument[]
+  emergencyContacts DriverEmergencyContact[]
+  incidents        DriverIncident[]
+  warnings         DriverWarning[]
 
   @@map("drivers")
 }
@@ -899,6 +903,86 @@ model CustomerCollection {
 
   @@index([tripId])
   @@map("customer_collections")
+}
+
+// ─────────────────────────────────────────────
+// DRIVER DOCUMENTATION
+// ─────────────────────────────────────────────
+
+model DriverDocument {
+  id         Int      @id @default(autoincrement())
+  driverId   Int
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  // DRIVER_LICENSE | PDP | PASSPORT | WORK_PERMIT | DRIVER_PHOTO | EMPLOYMENT_CONTRACT | OTHER
+  type       String
+  label      String?
+  filename   String
+  path       String
+  expiryDate DateTime?
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([type])
+  @@index([expiryDate])
+  @@map("driver_documents")
+}
+
+model DriverEmergencyContact {
+  id           Int     @id @default(autoincrement())
+  driverId     Int
+  driver       Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  name         String
+  relationship String
+  phone        String
+  altPhone     String?
+  email        String?
+  address      String? @db.Text
+  isPrimary    Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([driverId])
+  @@map("driver_emergency_contacts")
+}
+
+model DriverIncident {
+  id           Int      @id @default(autoincrement())
+  driverId     Int
+  driver       Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  incidentDate DateTime
+  title        String
+  description  String   @db.Text
+  // MINOR | MODERATE | MAJOR
+  severity     String   @default("MINOR")
+  // OPEN | UNDER_INVESTIGATION | CLOSED
+  status       String   @default("OPEN")
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([driverId])
+  @@map("driver_incidents")
+}
+
+model DriverWarning {
+  id           Int      @id @default(autoincrement())
+  driverId     Int
+  driver       Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  warningDate  DateTime
+  // VERBAL | WRITTEN | FINAL
+  type         String
+  reason       String
+  description  String   @db.Text
+  issuedBy     String
+  acknowledged Boolean  @default(false)
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([driverId])
+  @@map("driver_warnings")
 }
 
 // ─────────────────────────────────────────────

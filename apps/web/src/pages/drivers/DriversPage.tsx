@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye, FolderOpen, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
-import { format } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
+import DriverDocsModal from './DriverDocsModal';
 
 /* ── helpers ─────────────────────────────────────────── */
 
@@ -76,6 +77,7 @@ export default function DriversPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
   const [viewDriver, setViewDriver] = useState<Driver | null>(null);
+  const [docsDriverId, setDocsDriverId] = useState<number | null>(null);
 
   const { data: drivers = [], isLoading, isError } = useQuery<Driver[]>({
     queryKey: ['drivers'],
@@ -152,10 +154,10 @@ export default function DriversPage() {
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Mobile</th>
                 <th className="px-4 py-3 text-left">License No</th>
-                <th className="px-4 py-3 text-left">License Expiry</th>
                 <th className="px-4 py-3 text-left">Assigned Vehicle</th>
                 <th className="px-4 py-3 text-left">Trips</th>
                 <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">License Expiry</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -168,9 +170,6 @@ export default function DriversPage() {
                   <td className="px-4 py-3 text-gray-500">{d.mobile}</td>
                   <td className="px-4 py-3 text-gray-500">{d.licenseNo}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {safeDate(d.licenseExpiry, 'dd MMM yyyy')}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
                     {d.assignedVehicle ? `${d.assignedVehicle.name} (${d.assignedVehicle.registrationNo})` : '—'}
                   </td>
                   {/* FIX: guard against _count being null */}
@@ -179,7 +178,18 @@ export default function DriversPage() {
                     <Badge label={d.isActive ? 'Active' : 'Inactive'} variant={d.isActive ? 'green' : 'red'} />
                   </td>
                   <td className="px-4 py-3">
+                    {d.licenseExpiry ? (() => {
+                      const days = differenceInDays(parseISO(d.licenseExpiry!), new Date());
+                      if (days < 0)   return <span className="inline-flex items-center gap-1 text-xs text-red-600 font-medium"><AlertTriangle size={12}/>Expired</span>;
+                      if (days <= 30) return <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium"><AlertTriangle size={12}/>{days}d left</span>;
+                      if (days <= 90) return <span className="text-xs text-yellow-600">{safeDate(d.licenseExpiry, 'dd MMM yyyy')}</span>;
+                      return <span className="text-xs text-gray-500">{safeDate(d.licenseExpiry, 'dd MMM yyyy')}</span>;
+                    })() : <span className="text-xs text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => setDocsDriverId(d.id)} title="Driver Profile & Documents"
+                        className="p-1.5 text-gray-400 hover:text-brand-600"><FolderOpen size={16} /></button>
                       <button onClick={() => setViewDriver(d)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
                       <button onClick={() => openEdit(d)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
                       <button onClick={() => { if (confirm(`Delete driver "${d.name}"?`)) deleteMut.mutate(d.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
@@ -268,8 +278,20 @@ export default function DriversPage() {
               </div>
             ))}
           </div>
+          <div className="pt-4 border-t mt-4">
+            <button onClick={() => { setViewDriver(null); setDocsDriverId(viewDriver.id); }}
+              className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium">
+              <FolderOpen size={15}/> Open Documents & Profile
+            </button>
+          </div>
         </Modal>
       )}
+
+      <DriverDocsModal
+        driverId={docsDriverId}
+        open={docsDriverId !== null}
+        onClose={() => setDocsDriverId(null)}
+      />
     </div>
   );
 }
