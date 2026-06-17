@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { otpService } from '../otp/otp.service';
 
 const tripSelect = {
   id: true,
@@ -66,6 +67,14 @@ export const podService = {
   }) {
     const existing = await prisma.proofOfDelivery.findUnique({ where: { tripId: data.tripId } });
     if (existing) throw new AppError('A proof of delivery already exists for this trip', 409);
+
+    const authorised = await otpService.isAuthorised(data.tripId);
+    if (!authorised) {
+      throw new AppError(
+        'OTP verification is required before recording proof of delivery. Send an OTP to the customer and verify it, or request an administrator bypass.',
+        403,
+      );
+    }
 
     return prisma.proofOfDelivery.create({
       data,

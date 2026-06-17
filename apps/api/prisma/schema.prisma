@@ -289,8 +289,10 @@ model Trip {
   inspectionImages InspectionImage[]
   positions        Position[]
   warehouseVehicle WarehouseVehicle?
-  gateScans        GateScan[]
-  proofOfDelivery  ProofOfDelivery?
+  gateScans           GateScan[]
+  proofOfDelivery     ProofOfDelivery?
+  deliveryOtp         DeliveryOtp?
+  customerCollection  CustomerCollection?
 
   @@map("trips")
 }
@@ -854,4 +856,75 @@ model PodPhoto {
   createdAt DateTime        @default(now())
 
   @@map("pod_photos")
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER COLLECTION
+// ─────────────────────────────────────────────
+
+model CustomerCollection {
+  id     Int  @id @default(autoincrement())
+  tripId Int  @unique
+  trip   Trip @relation(fields: [tripId], references: [id])
+
+  // Collector identity
+  collectorFirstName  String
+  collectorLastName   String
+  collectorPhone      String
+  collectorEmail      String?
+  relationshipToOwner String?
+
+  // Identity verification
+  idType      String  // South African ID | Passport | Driver's License | Other
+  idNumber    String
+  idPhotoPath String? // path to uploaded ID document photo
+
+  // Selfie (anti-fraud)
+  selfiePath String? // path to captured selfie photo
+
+  // Digital signature
+  signature String @db.LongText
+
+  // GPS at time of collection
+  gpsLatitude  Float?
+  gpsLongitude Float?
+  gpsAccuracy  Float?
+
+  // Confirmation
+  collectedAt DateTime @default(now())
+  notes       String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@map("customer_collections")
+}
+
+// ─────────────────────────────────────────────
+// OTP DELIVERY VERIFICATION
+// ─────────────────────────────────────────────
+
+model DeliveryOtp {
+  id          Int       @id @default(autoincrement())
+  tripId      Int       @unique
+  trip        Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  codeHash     String   // bcrypt hash of 6-digit code
+  sentTo       String   // email address OTP was sent to
+  expiresAt    DateTime
+  verified     Boolean  @default(false)
+  verifiedAt   DateTime?
+  attempts     Int      @default(0)
+
+  // Admin bypass
+  bypassedBy   Int?     // userId who approved bypass
+  bypassedAt   DateTime?
+  bypassReason String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tripId])
+  @@map("delivery_otps")
 }

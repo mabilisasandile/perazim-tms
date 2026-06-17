@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Truck, Users, Route, UserCircle,
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
-  ClipboardList, Package, Search, History, Building2, ScanLine, BadgeCheck
+  ClipboardList, Package, Search, History, Building2, ScanLine, BadgeCheck, UserCheck
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -25,6 +25,7 @@ const navItems = [
   { to: '/app/warehouses',       icon: Building2,       label: 'Warehouses' },
   { to: '/app/gate-scans',      icon: ScanLine,        label: 'Gate Scanning' },
   { to: '/app/pod',             icon: BadgeCheck,      label: 'Proof of Delivery' },
+  { to: '/app/collections',     icon: UserCheck,       label: 'Customer Collection' },
   { to: '/app/loadsheets',       icon: Package,         label: 'Load Sheets' },
   { to: '/app/reminders',        icon: Bell,            label: 'Reminders' },
   { to: '/app/users',            icon: ShieldCheck,     label: 'Users' },

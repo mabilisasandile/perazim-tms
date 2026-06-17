@@ -7,9 +7,11 @@ import {
   Plus, Loader2, Eye, Trash2, CheckCircle2, MapPin, Camera,
   Phone, Mail, CreditCard, Users, Navigation, X, ChevronRight,
   Image as ImageIcon, FileCheck, Download, User, ClipboardCheck,
+  ShieldCheck, Send, KeyRound, AlertTriangle, ShieldAlert,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import { useAuthStore } from '../../stores/authStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +52,19 @@ interface TripOption {
   id: number; trackingCode: string; status: string;
   fromLocation: string; toLocation: string;
   customerVehicleRegistration: string | null;
-  customer: { name: string };
+  customer: { name: string; email: string };
+}
+
+type OtpStatus = 'none' | 'pending' | 'expired' | 'verified' | 'bypassed';
+
+interface OtpState {
+  status: OtpStatus;
+  sentTo?: string;
+  expiresAt?: string;
+  attempts?: number;
+  verifiedAt?: string;
+  bypassReason?: string;
+  bypassedAt?: string;
 }
 
 // ── Relationships ──────────────────────────────────────────────────────────────
@@ -203,6 +217,230 @@ function PhotoStrip({ podId, photos, onRefresh }: { podId: number; photos: PodPh
   );
 }
 
+// ── OTP Verification Step ─────────────────────────────────────────────────────
+
+function OtpStep({
+  tripId,
+  customerEmail,
+  otpState,
+  onOtpState,
+}: {
+  tripId: number;
+  customerEmail: string;
+  otpState: OtpState;
+  onOtpState: (s: OtpState) => void;
+}) {
+  const { hasRole } = useAuthStore();
+  const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN');
+
+  const [code, setCode]             = useState('');
+  const [bypassReason, setBypassReason] = useState('');
+  const [showBypass, setShowBypass] = useState(false);
+  const [sendErr, setSendErr]       = useState('');
+  const [verifyErr, setVerifyErr]   = useState('');
+  const [bypassErr, setBypassErr]   = useState('');
+
+  const sendMut = useMutation({
+    mutationFn: () => api.post('/otp/send', { tripId }),
+    onSuccess: (res) => {
+      setSendErr('');
+      onOtpState({ status: 'pending', sentTo: res.data.sentTo, expiresAt: res.data.expiresAt, attempts: 0 });
+    },
+    onError: (e: any) => setSendErr(e.response?.data?.error || 'Failed to send OTP'),
+  });
+
+  const verifyMut = useMutation({
+    mutationFn: () => api.post('/otp/verify', { tripId, code }),
+    onSuccess: () => {
+      setVerifyErr('');
+      onOtpState({ status: 'verified', verifiedAt: new Date().toISOString() });
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.error || 'Verification failed';
+      setVerifyErr(msg);
+      // Refresh attempts count
+      api.get(`/otp/status/${tripId}`).then(r => onOtpState(r.data)).catch(() => {});
+    },
+  });
+
+  const bypassMut = useMutation({
+    mutationFn: () => api.post('/otp/bypass', { tripId, reason: bypassReason }),
+    onSuccess: () => {
+      setBypassErr('');
+      onOtpState({ status: 'bypassed', bypassReason, bypassedAt: new Date().toISOString() });
+      setShowBypass(false);
+    },
+    onError: (e: any) => setBypassErr(e.response?.data?.error || 'Bypass failed'),
+  });
+
+  // ── Verified / Bypassed banner ────────────────────────────────────────────
+
+  if (otpState.status === 'verified') {
+    return (
+      <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+        <ShieldCheck size={20} className="text-green-600 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-green-800">OTP Verified</p>
+          <p className="text-sm text-green-700 mt-0.5">
+            Customer identity confirmed. You may proceed to record the delivery.
+          </p>
+          {otpState.verifiedAt && (
+            <p className="text-xs text-green-600 mt-1">
+              {format(new Date(otpState.verifiedAt), 'dd MMM yyyy HH:mm')}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (otpState.status === 'bypassed') {
+    return (
+      <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+        <ShieldAlert size={20} className="text-amber-600 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-amber-800">Administrator Bypass Approved</p>
+          <p className="text-sm text-amber-700 mt-0.5">
+            OTP requirement waived. Reason: <em>{otpState.bypassReason}</em>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main OTP UI ───────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-4">
+      {/* Info banner */}
+      <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+        <ShieldCheck size={18} className="text-blue-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-blue-800">
+          <p className="font-semibold">OTP Delivery Verification Required</p>
+          <p className="mt-0.5 text-blue-700">
+            Send a one-time code to the customer. They will share it with you to confirm they authorise this delivery.
+          </p>
+        </div>
+      </div>
+
+      {/* Step 1: Send OTP */}
+      <div className="border rounded-xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-brand-600 text-white text-xs flex items-center justify-center shrink-0">1</span>
+          Send OTP to Customer
+        </p>
+        <p className="text-xs text-gray-500">
+          Sending to: <span className="font-mono text-gray-700">{customerEmail}</span>
+        </p>
+        {sendErr && (
+          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertTriangle size={13} /> {sendErr}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => sendMut.mutate()}
+          disabled={sendMut.isPending}
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg disabled:opacity-60 transition-colors"
+        >
+          {sendMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          {otpState.status === 'pending' || otpState.status === 'expired' ? 'Resend OTP' : 'Send OTP'}
+        </button>
+        {otpState.status === 'pending' && otpState.expiresAt && (
+          <p className="text-xs text-green-700 flex items-center gap-1">
+            <CheckCircle2 size={12} /> OTP sent to {otpState.sentTo} — expires {format(new Date(otpState.expiresAt), 'HH:mm')}
+          </p>
+        )}
+        {otpState.status === 'expired' && (
+          <p className="text-xs text-amber-600 flex items-center gap-1">
+            <AlertTriangle size={12} /> OTP expired — please resend.
+          </p>
+        )}
+      </div>
+
+      {/* Step 2: Enter code */}
+      {(otpState.status === 'pending') && (
+        <div className="border rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-brand-600 text-white text-xs flex items-center justify-center shrink-0">2</span>
+            Enter Code from Customer
+          </p>
+          <p className="text-xs text-gray-500">Ask the customer to read the 6-digit code they received by email.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={code}
+              onChange={e => { setCode(e.target.value.replace(/\D/g, '')); setVerifyErr(''); }}
+              placeholder="——————"
+              className="flex-1 border rounded-lg px-4 py-2.5 text-center text-xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <button
+              type="button"
+              onClick={() => verifyMut.mutate()}
+              disabled={code.length !== 6 || verifyMut.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {verifyMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+              Verify
+            </button>
+          </div>
+          {verifyErr && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> {verifyErr}
+            </div>
+          )}
+          {typeof otpState.attempts === 'number' && otpState.attempts > 0 && (
+            <p className="text-xs text-amber-600">{otpState.attempts} failed attempt{otpState.attempts !== 1 ? 's' : ''} — {5 - otpState.attempts} remaining.</p>
+          )}
+        </div>
+      )}
+
+      {/* Admin bypass */}
+      {isAdmin && (
+        <div className="border border-dashed border-amber-300 rounded-xl p-4 space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowBypass(v => !v)}
+            className="flex items-center gap-2 text-sm text-amber-700 font-medium hover:text-amber-900"
+          >
+            <ShieldAlert size={14} /> Administrator Bypass {showBypass ? '▲' : '▼'}
+          </button>
+          {showBypass && (
+            <div className="space-y-3">
+              <p className="text-xs text-amber-700">
+                Use only when the customer cannot be reached and delivery must proceed. This action is logged.
+              </p>
+              <textarea
+                value={bypassReason}
+                onChange={e => { setBypassReason(e.target.value); setBypassErr(''); }}
+                rows={2}
+                placeholder="Reason for bypassing OTP verification…"
+                className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+              />
+              {bypassErr && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle size={13} /> {bypassErr}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => bypassMut.mutate()}
+                disabled={bypassReason.trim().length < 5 || bypassMut.isPending}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
+              >
+                {bypassMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
+                Approve Bypass
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Download POD helper ────────────────────────────────────────────────────────
 
 function downloadPOD(pod: POD) {
@@ -296,11 +534,12 @@ function downloadPOD(pod: POD) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
-type FormStep = 'trip' | 'receiver' | 'verification' | 'signature';
+type FormStep = 'trip' | 'receiver' | 'otp' | 'verification' | 'signature';
 
 const STEPS: { id: FormStep; label: string }[] = [
   { id: 'trip',         label: 'Trip' },
   { id: 'receiver',     label: 'Receiver' },
+  { id: 'otp',         label: 'OTP' },
   { id: 'verification', label: 'Location & Notes' },
   { id: 'signature',    label: 'Signature' },
 ];
@@ -324,6 +563,7 @@ export default function PODPage() {
   const [gpsLng,              setGpsLng]              = useState<number | null>(null);
   const [gpsAcc,              setGpsAcc]              = useState<number | null>(null);
   const [signature,           setSignature]           = useState('');
+  const [otpState,            setOtpState]            = useState<OtpState>({ status: 'none' });
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -342,6 +582,20 @@ export default function PODPage() {
 
   // Trips that already have a POD
   const podTripIds = new Set(pods.map(p => p.tripId));
+
+  // When trip selection changes, fetch existing OTP status
+  const handleTripChange = async (id: string) => {
+    setTripId(id);
+    setOtpState({ status: 'none' });
+    if (id) {
+      try {
+        const res = await api.get(`/otp/status/${id}`);
+        setOtpState(res.data);
+      } catch {
+        setOtpState({ status: 'none' });
+      }
+    }
+  };
 
   // ── Mutations ────────────────────────────────────────────────────────────────
 
@@ -368,6 +622,7 @@ export default function PODPage() {
     setRelationshipToOwner(''); setNotes('');
     setGpsLat(null); setGpsLng(null); setGpsAcc(null);
     setSignature('');
+    setOtpState({ status: 'none' });
     setFormOpen(true);
   };
 
@@ -375,10 +630,14 @@ export default function PODPage() {
 
   const stepIndex = STEPS.findIndex(s => s.id === step);
 
+  const otpAuthorised = otpState.status === 'verified' || otpState.status === 'bypassed';
+
   const canNext = step === 'trip'
     ? !!tripId
     : step === 'receiver'
     ? (!!receiverFirstName && !!receiverLastName && !!receiverPhone)
+    : step === 'otp'
+    ? otpAuthorised
     : true;
 
   const handleSubmit = () => {
@@ -402,6 +661,8 @@ export default function PODPage() {
     if (!viewing) return;
     api.get(`/pod/${viewing.id}`).then(r => setViewing(r.data));
   }, [viewing]);
+
+  const selectedTrip = trips.find(t => String(t.id) === tripId);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -524,6 +785,7 @@ export default function PODPage() {
                 onClick={() => i < stepIndex ? setStep(s.id) : undefined}
                 className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${step === s.id ? 'bg-brand-600 text-white' : i < stepIndex ? 'bg-brand-100 text-brand-700 hover:bg-brand-200 cursor-pointer' : 'text-gray-400 bg-gray-100'}`}
               >
+                {s.id === 'otp' && (i < stepIndex ? <ShieldCheck size={10} /> : <ShieldCheck size={10} />)}
                 {i + 1}. {s.label}
               </button>
               {i < STEPS.length - 1 && <ChevronRight size={13} className="text-gray-300 shrink-0" />}
@@ -538,7 +800,7 @@ export default function PODPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Trip / Booking *</label>
               <select
                 value={tripId}
-                onChange={e => setTripId(e.target.value)}
+                onChange={e => handleTripChange(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Choose a trip…</option>
@@ -555,21 +817,18 @@ export default function PODPage() {
             </div>
 
             {/* Preview selected trip */}
-            {tripId && (() => {
-              const t = trips.find(x => String(x.id) === tripId);
-              if (!t) return null;
-              return (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Badge label={t.status} variant="blue" />
-                    <span className="text-gray-500 font-mono text-xs">{t.trackingCode.slice(0, 12)}…</span>
-                  </div>
-                  <p className="font-medium text-gray-900">{t.customer.name}</p>
-                  {t.customerVehicleRegistration && <p className="text-gray-500">Vehicle: {t.customerVehicleRegistration}</p>}
-                  <p className="text-gray-500 flex items-center gap-1"><MapPin size={12} /> {t.fromLocation} → {t.toLocation}</p>
+            {tripId && selectedTrip && (
+              <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge label={selectedTrip.status} variant="blue" />
+                  <span className="text-gray-500 font-mono text-xs">{selectedTrip.trackingCode.slice(0, 12)}…</span>
                 </div>
-              );
-            })()}
+                <p className="font-medium text-gray-900">{selectedTrip.customer.name}</p>
+                {selectedTrip.customerVehicleRegistration && <p className="text-gray-500">Vehicle: {selectedTrip.customerVehicleRegistration}</p>}
+                <p className="text-gray-500 flex items-center gap-1"><MapPin size={12} /> {selectedTrip.fromLocation} → {selectedTrip.toLocation}</p>
+                <p className="text-gray-400 text-xs flex items-center gap-1"><Mail size={11} /> OTP will be sent to: {selectedTrip.customer.email}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -614,7 +873,17 @@ export default function PODPage() {
           </div>
         )}
 
-        {/* ── Step 3: GPS + Notes ───────────────── */}
+        {/* ── Step 3: OTP Verification ──────────── */}
+        {step === 'otp' && selectedTrip && (
+          <OtpStep
+            tripId={Number(tripId)}
+            customerEmail={selectedTrip.customer.email}
+            otpState={otpState}
+            onOtpState={setOtpState}
+          />
+        )}
+
+        {/* ── Step 4: GPS + Notes ───────────────── */}
         {step === 'verification' && (
           <div className="space-y-5">
             <GPSCapture
@@ -634,7 +903,7 @@ export default function PODPage() {
           </div>
         )}
 
-        {/* ── Step 4: Signature ─────────────────── */}
+        {/* ── Step 5: Signature ─────────────────── */}
         {step === 'signature' && (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
@@ -675,6 +944,12 @@ export default function PODPage() {
             </button>
           )}
         </div>
+
+        {createMut.isError && (
+          <p className="text-xs text-red-600 mt-2 text-center">
+            {(createMut.error as any)?.response?.data?.error || 'Failed to record delivery.'}
+          </p>
+        )}
       </Modal>
 
       {/* ── VIEW POD MODAL ───────────────────────────────────── */}

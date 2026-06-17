@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { CreateTripDto, UpdateTripDto } from './trips.schema';
 import { TripStatus } from '@prisma/client';
+import { otpService } from '../otp/otp.service';
 
 export const tripsService = {
   async findAll(filters?: { vehicleId?: number; driverId?: number; status?: TripStatus }) {
@@ -107,6 +108,15 @@ export const tripsService = {
 
   async updateStatus(id: number, status: TripStatus) {
     await this.findById(id);
+    if (status === 'COMPLETED') {
+      const authorised = await otpService.isAuthorised(id);
+      if (!authorised) {
+        throw new AppError(
+          'OTP verification is required to complete this trip. Send an OTP to the customer and verify it, or request an administrator bypass.',
+          403,
+        );
+      }
+    }
     return prisma.trip.update({ where: { id }, data: { status } });
   },
 

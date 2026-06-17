@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon, QrCode } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon, QrCode, ShieldCheck, ShieldAlert, Send, KeyRound, AlertTriangle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import QRCodeModal from '../../components/ui/QRCodeModal';
 import { format } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Trip {
   id: number;
@@ -67,6 +68,20 @@ export default function TripsPage() {
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
   const [qrTrip, setQrTrip] = useState<Trip | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [statusErr,    setStatusErr]    = useState('');
+
+  // OTP state for view modal
+  type OtpInfo = { status: string; sentTo?: string; expiresAt?: string; attempts?: number; verifiedAt?: string; bypassReason?: string };
+  const [otpInfo,      setOtpInfo]      = useState<OtpInfo | null>(null);
+  const [otpCode,      setOtpCode]      = useState('');
+  const [otpSendErr,   setOtpSendErr]   = useState('');
+  const [otpVerifyErr, setOtpVerifyErr] = useState('');
+  const [otpBypassErr, setOtpBypassErr] = useState('');
+  const [bypassReason, setBypassReason] = useState('');
+  const [showBypass,   setShowBypass]   = useState(false);
+
+  const { hasRole } = useAuthStore();
+  const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN');
 
   const { data: trips = [], isLoading, isError } = useQuery<Trip[]>({
     queryKey: ['trips', statusFilter],
@@ -109,8 +124,46 @@ export default function TripsPage() {
 
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => api.patch(`/trips/${id}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['trips'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); setStatusErr(''); },
+    onError: (e: any) => setStatusErr(e.response?.data?.error || 'Failed to update status'),
   });
+
+  const otpSendMut = useMutation({
+    mutationFn: (tripId: number) => api.post('/otp/send', { tripId }),
+    onSuccess: (res) => {
+      setOtpSendErr('');
+      setOtpInfo({ status: 'pending', sentTo: res.data.sentTo, expiresAt: res.data.expiresAt, attempts: 0 });
+    },
+    onError: (e: any) => setOtpSendErr(e.response?.data?.error || 'Failed to send OTP'),
+  });
+
+  const otpVerifyMut = useMutation({
+    mutationFn: ({ tripId, code }: { tripId: number; code: string }) => api.post('/otp/verify', { tripId, code }),
+    onSuccess: () => {
+      setOtpVerifyErr('');
+      setOtpInfo({ status: 'verified', verifiedAt: new Date().toISOString() });
+    },
+    onError: (e: any) => setOtpVerifyErr(e.response?.data?.error || 'Verification failed'),
+  });
+
+  const otpBypassMut = useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: number; reason: string }) => api.post('/otp/bypass', { tripId, reason }),
+    onSuccess: () => {
+      setOtpBypassErr('');
+      setOtpInfo({ status: 'bypassed', bypassReason });
+      setShowBypass(false);
+    },
+    onError: (e: any) => setOtpBypassErr(e.response?.data?.error || 'Bypass failed'),
+  });
+
+  const openViewTrip = async (t: Trip) => {
+    setViewTrip(t);
+    setOtpInfo(null); setOtpCode(''); setOtpSendErr(''); setOtpVerifyErr(''); setOtpBypassErr(''); setBypassReason(''); setShowBypass(false); setStatusErr('');
+    try {
+      const res = await api.get(`/otp/status/${t.id}`);
+      setOtpInfo(res.data);
+    } catch { setOtpInfo({ status: 'none' }); }
+  };
 
   const fmt = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 
@@ -175,12 +228,12 @@ export default function TripsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setQrTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600" title="View QR Code"><QrCode size={15} /></button>
-                        <button onClick={() => setViewTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={15} /></button>
+                        <button onClick={() => openViewTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={15} /></button>
                         {t.status === 'PENDING' && (
                           <button onClick={() => statusMut.mutate({ id: t.id, status: 'IN_PROGRESS' })} className="p-1.5 text-gray-400 hover:text-blue-600" title="Start trip"><TruckIcon size={15} /></button>
                         )}
                         {t.status === 'IN_PROGRESS' && (
-                          <button onClick={() => statusMut.mutate({ id: t.id, status: 'COMPLETED' })} className="p-1.5 text-gray-400 hover:text-green-600" title="Complete trip"><CheckCircle2 size={15} /></button>
+                          <button onClick={() => openViewTrip(t)} className="p-1.5 text-gray-400 hover:text-green-600" title="Complete trip (OTP required)"><CheckCircle2 size={15} /></button>
                         )}
                         <button onClick={() => { if (confirm('Delete this trip?')) deleteMut.mutate(t.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
                       </div>
@@ -298,7 +351,8 @@ export default function TripsPage() {
       {/* View Trip Modal */}
       {viewTrip && (
         <Modal title={`Trip #${viewTrip.id}`} open={!!viewTrip} onClose={() => setViewTrip(null)} width="max-w-xl">
-          <div className="space-y-4 text-sm">
+          <div className="space-y-5 text-sm max-h-[80vh] overflow-y-auto pr-1">
+            {/* Trip details */}
             <div className="grid grid-cols-2 gap-3">
               <div><p className="text-gray-500">Tracking Code</p><p className="font-mono font-medium">{viewTrip.trackingCode}</p></div>
               <div><p className="text-gray-500">Status</p><Badge label={statusMeta[viewTrip.status].label} variant={statusMeta[viewTrip.status].variant} /></div>
@@ -317,6 +371,140 @@ export default function TripsPage() {
                 </p>
               </div>
             </div>
+
+            {/* ── OTP Delivery Verification ─────────────────────────── */}
+            {viewTrip.status !== 'CANCELLED' && viewTrip.status !== 'PENDING' && (
+              <div className="border-t pt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <ShieldCheck size={13} className="text-brand-600" /> OTP Delivery Verification
+                </p>
+
+                {/* Status banner */}
+                {otpInfo?.status === 'verified' && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-800 text-xs font-medium">
+                    <ShieldCheck size={15} className="text-green-600 shrink-0" />
+                    OTP Verified — {otpInfo.verifiedAt ? format(new Date(otpInfo.verifiedAt), 'dd MMM yyyy HH:mm') : ''}
+                  </div>
+                )}
+                {otpInfo?.status === 'bypassed' && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium">
+                    <ShieldAlert size={15} className="text-amber-600 shrink-0" />
+                    Admin Bypass Approved — <em>{otpInfo.bypassReason}</em>
+                  </div>
+                )}
+                {(!otpInfo || otpInfo.status === 'none' || otpInfo.status === 'expired') && (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-xs">
+                    <ShieldCheck size={14} className="shrink-0" />
+                    {otpInfo?.status === 'expired' ? 'OTP expired — resend to continue.' : 'No OTP sent yet.'}
+                  </div>
+                )}
+                {otpInfo?.status === 'pending' && (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs">
+                    <ShieldCheck size={14} className="shrink-0" />
+                    OTP sent to <strong>{otpInfo.sentTo}</strong> — expires {otpInfo.expiresAt ? format(new Date(otpInfo.expiresAt), 'HH:mm') : ''}
+                  </div>
+                )}
+
+                {/* Send / Resend OTP */}
+                {otpInfo?.status !== 'verified' && otpInfo?.status !== 'bypassed' && (
+                  <div className="space-y-2">
+                    {otpSendErr && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={12} /> {otpSendErr}</p>}
+                    <button
+                      type="button"
+                      onClick={() => { setOtpSendErr(''); otpSendMut.mutate(viewTrip.id); }}
+                      disabled={otpSendMut.isPending}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium rounded-lg disabled:opacity-60"
+                    >
+                      {otpSendMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                      {otpInfo?.status === 'pending' ? 'Resend OTP' : 'Send OTP to Customer'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Verify input */}
+                {otpInfo?.status === 'pending' && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-600">Enter the 6-digit code provided by the customer:</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '')); setOtpVerifyErr(''); }}
+                        placeholder="——————"
+                        className="flex-1 border rounded-lg px-3 py-2 text-center text-lg font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => otpVerifyMut.mutate({ tripId: viewTrip.id, code: otpCode })}
+                        disabled={otpCode.length !== 6 || otpVerifyMut.isPending}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg disabled:opacity-50"
+                      >
+                        {otpVerifyMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
+                        Verify
+                      </button>
+                    </div>
+                    {otpVerifyErr && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={12} /> {otpVerifyErr}</p>}
+                  </div>
+                )}
+
+                {/* Admin bypass */}
+                {isAdmin && otpInfo?.status !== 'verified' && otpInfo?.status !== 'bypassed' && (
+                  <div className="border border-dashed border-amber-300 rounded-xl p-3 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowBypass(v => !v)}
+                      className="flex items-center gap-1.5 text-xs text-amber-700 font-medium hover:text-amber-900"
+                    >
+                      <ShieldAlert size={13} /> Administrator Bypass {showBypass ? '▲' : '▼'}
+                    </button>
+                    {showBypass && (
+                      <div className="space-y-2">
+                        <textarea
+                          value={bypassReason}
+                          onChange={e => { setBypassReason(e.target.value); setOtpBypassErr(''); }}
+                          rows={2}
+                          placeholder="Reason for bypassing OTP verification…"
+                          className="w-full border border-amber-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+                        />
+                        {otpBypassErr && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={12} /> {otpBypassErr}</p>}
+                        <button
+                          type="button"
+                          onClick={() => otpBypassMut.mutate({ tripId: viewTrip.id, reason: bypassReason })}
+                          disabled={bypassReason.trim().length < 5 || otpBypassMut.isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg disabled:opacity-50"
+                        >
+                          {otpBypassMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
+                          Approve Bypass
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Complete trip button (only IN_PROGRESS + OTP authorised) */}
+                {viewTrip.status === 'IN_PROGRESS' && (otpInfo?.status === 'verified' || otpInfo?.status === 'bypassed') && (
+                  <div className="pt-1 space-y-2">
+                    {statusErr && <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={12} /> {statusErr}</p>}
+                    <button
+                      type="button"
+                      onClick={() => statusMut.mutate({ id: viewTrip.id, status: 'COMPLETED' })}
+                      disabled={statusMut.isPending}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-60"
+                    >
+                      {statusMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      Mark Trip Completed
+                    </button>
+                  </div>
+                )}
+                {viewTrip.status === 'IN_PROGRESS' && otpInfo && otpInfo.status !== 'verified' && otpInfo.status !== 'bypassed' && (
+                  <p className="text-xs text-amber-700 flex items-center gap-1">
+                    <AlertTriangle size={12} /> Complete OTP verification above before marking this trip as completed.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
       )}
