@@ -213,6 +213,8 @@ model Driver {
   emergencyContacts DriverEmergencyContact[]
   incidents        DriverIncident[]
   warnings         DriverWarning[]
+  payrollConfig    DriverPayrollConfig?
+  payrollEntries   PayrollEntry[]
 
   @@map("drivers")
 }
@@ -297,6 +299,7 @@ model Trip {
   proofOfDelivery     ProofOfDelivery?
   deliveryOtp         DeliveryOtp?
   customerCollection  CustomerCollection?
+  payrollLinks        PayrollTripLink[]
 
   @@map("trips")
 }
@@ -1011,4 +1014,89 @@ model DeliveryOtp {
 
   @@index([tripId])
   @@map("delivery_otps")
+}
+
+// ─────────────────────────────────────────────
+// PAYROLL
+// ─────────────────────────────────────────────
+
+model PayrollSetting {
+  id                Int      @id @default(autoincrement())
+  baseEnabled       Boolean  @default(false)
+  defaultBaseSalary Decimal? @db.Decimal(10, 2)
+  tripRateEnabled   Boolean  @default(true)
+  defaultTripRate   Decimal? @db.Decimal(10, 2)
+  commissionEnabled Boolean  @default(false)
+  commissionRate    Float?
+  currency          String   @default("ZAR")
+  updatedAt         DateTime @updatedAt
+
+  @@map("payroll_settings")
+}
+
+model DriverPayrollConfig {
+  id             Int      @id @default(autoincrement())
+  driverId       Int      @unique
+  driver         Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  baseSalary     Decimal? @db.Decimal(10, 2)
+  tripRate       Decimal? @db.Decimal(10, 2)
+  commissionRate Float?
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("driver_payroll_configs")
+}
+
+model PayrollEntry {
+  id            Int      @id @default(autoincrement())
+  driverId      Int
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  // WEEKLY | MONTHLY
+  periodType    String
+  periodStart   DateTime
+  periodEnd     DateTime
+  // Earnings
+  baseSalary    Decimal  @db.Decimal(10, 2) @default(0)
+  tripCount     Int      @default(0)
+  tripEarnings  Decimal  @db.Decimal(10, 2) @default(0)
+  commissions   Decimal  @db.Decimal(10, 2) @default(0)
+  bonuses       Decimal  @db.Decimal(10, 2) @default(0)
+  deductions    Decimal  @db.Decimal(10, 2) @default(0)
+  grossPay      Decimal  @db.Decimal(10, 2) @default(0)
+  netPay        Decimal  @db.Decimal(10, 2) @default(0)
+  // Status: DRAFT | APPROVED | PAID | OUTSTANDING
+  status        String   @default("DRAFT")
+  approvedAt    DateTime?
+  approvedBy    String?
+  paidAt        DateTime?
+  paymentMethod String?
+  paymentRef    String?
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tripLinks     PayrollTripLink[]
+
+  @@index([driverId])
+  @@index([status])
+  @@index([periodStart])
+  @@map("payroll_entries")
+}
+
+model PayrollTripLink {
+  id             Int          @id @default(autoincrement())
+  payrollEntryId Int
+  payrollEntry   PayrollEntry @relation(fields: [payrollEntryId], references: [id], onDelete: Cascade)
+  tripId         Int
+  trip           Trip         @relation(fields: [tripId], references: [id])
+  tripAmount     Decimal      @db.Decimal(10, 2) @default(0)
+  tripRate       Decimal      @db.Decimal(10, 2) @default(0)
+  commission     Decimal      @db.Decimal(10, 2) @default(0)
+  driverEarnings Decimal      @db.Decimal(10, 2) @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@unique([payrollEntryId, tripId])
+  @@index([payrollEntryId])
+  @@map("payroll_trip_links")
 }
