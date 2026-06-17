@@ -31,6 +31,7 @@ const navItems = [
   { to: '/app/reminders',        icon: Bell,            label: 'Reminders' },
   { to: '/app/users',            icon: ShieldCheck,     label: 'Users' },
   { to: '/app/fuel-tanker',        icon: Fuel,             label: 'Fuel Tanker Division' },
+  { to: '/app/flat-deck',          icon: Container,        label: 'Flat Deck Division' },
   { to: '/app/reporting',         icon: BarChart2,        label: 'Reports & Analytics' },
   { to: '/app/notifications',    icon: BellRing,        label: 'Notifications' },
   { to: '/app/audit-trail',      icon: History,         label: 'Audit Trail' },

@@ -41,6 +41,7 @@ import driverDocsRoutes      from './modules/driver-docs/driver-docs.routes';
 import payrollRoutes         from './modules/payroll/payroll.routes';
 import notificationRoutes    from './modules/notifications/notification.routes';
 import fuelTankerRoutes      from './modules/fuel-tanker/fuel-tanker.routes';
+import flatDeckRoutes        from './modules/flat-deck/flat-deck.routes';
 
 const app = express();
 
@@ -100,6 +101,7 @@ app.use(`${v1}/driver-docs`,     driverDocsRoutes);
 app.use(`${v1}/payroll`,         payrollRoutes);
 app.use(`${v1}/notifications`,   notificationRoutes);
 app.use(`${v1}/fuel-tanker`,     fuelTankerRoutes);
+app.use(`${v1}/flat-deck`,       flatDeckRoutes);
 
 // ─── Error Handling ───────────────────────────────────────
 app.use(notFound);

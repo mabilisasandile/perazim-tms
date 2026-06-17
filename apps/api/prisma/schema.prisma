@@ -144,6 +144,7 @@ model Vehicle {
   incomeExpenses    IncomeExpense[]
   loadSheets        LoadSheet[]
   assignedTrailers  Trailer[]         @relation("VehicleAssignedTrailers")
+  flatDeckJobs      FlatDeckJob[]     @relation("FlatDeckVehicle")
 
   @@map("vehicles")
 }
@@ -170,9 +171,10 @@ model Trailer {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  drivers    Driver[]
-  trips      Trip[]
-  loadSheets LoadSheet[]
+  drivers       Driver[]
+  trips         Trip[]
+  loadSheets    LoadSheet[]
+  flatDeckJobs  FlatDeckJob[]
 
   @@map("trailers")
 }
@@ -1141,6 +1143,81 @@ model PayrollTripLink {
   @@unique([payrollEntryId, tripId])
   @@index([payrollEntryId])
   @@map("payroll_trip_links")
+}
+
+// ─────────────────────────────────────────────
+// FLAT DECK DIVISION
+// ─────────────────────────────────────────────
+
+enum FlatDeckTrailerType {
+  FLAT_12M            // 12m Flat Deck
+  SUPERLINK_FLAT_DECK // Superlink Flat Deck
+  TAUTLINER
+  LOWBED
+}
+
+model FlatDeckJob {
+  id          Int                @id @default(autoincrement())
+  reference   String             @unique
+  trailerType FlatDeckTrailerType
+  trailerId   Int?
+  trailer     Trailer?           @relation(fields: [trailerId], references: [id])
+  vehicleId   Int?
+  vehicle     Vehicle?           @relation("FlatDeckVehicle", fields: [vehicleId], references: [id])
+  driverName  String?
+  origin      String
+  destination String
+  plannedDate DateTime
+  deliveredAt DateTime?
+  // PLANNED | LOADING | IN_TRANSIT | DELIVERED | CANCELLED
+  status      String             @default("PLANNED")
+  totalWeight Float              @default(0)
+  notes       String?            @db.Text
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  cargo FlatDeckCargo[]
+
+  @@map("flat_deck_jobs")
+}
+
+model FlatDeckCargo {
+  id                 Int         @id @default(autoincrement())
+  jobId              Int
+  job                FlatDeckJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  description        String
+  quantity           Int         @default(1)
+  weightPerUnit      Float
+  totalWeight        Float
+  lengthM            Float?
+  widthM             Float?
+  heightM            Float?
+  // STANDARD | OVERSIZED | HAZARDOUS | FRAGILE | HEAVY_LIFT
+  specialRequirement String      @default("STANDARD")
+  notes              String?
+
+  @@map("flat_deck_cargo")
+}
+
+model FlatDeckRoute {
+  id              Int      @id @default(autoincrement())
+  name            String
+  origin          String
+  destination     String
+  distanceKm      Float?
+  maxWeightTonnes Float?
+  maxHeightM      Float?
+  maxLengthM      Float?
+  allows12mFlat   Boolean  @default(true)
+  allowsSuperlink Boolean  @default(true)
+  allowsTautliner Boolean  @default(true)
+  allowsLowbed    Boolean  @default(true)
+  notes           String?  @db.Text
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("flat_deck_routes")
 }
 
 // ─────────────────────────────────────────────

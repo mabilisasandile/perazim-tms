@@ -41,6 +41,7 @@ import PayrollPage          from './pages/payroll/PayrollPage';
 import NotificationsPage    from './pages/notifications/NotificationsPage';
 import ReportingPage        from './pages/reporting/ReportingPage';
 import FuelTankerPage       from './pages/fuel-tanker/FuelTankerPage';
+import FlatDeckPage         from './pages/flat-deck/FlatDeckPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user      = useAuthStore((s) => s.user);
@@ -128,6 +129,7 @@ export default function App() {
           <Route path="notifications"    element={<NotificationsPage />} />
           <Route path="reporting"        element={<ReportingPage />} />
           <Route path="fuel-tanker"      element={<FuelTankerPage />} />
+          <Route path="flat-deck"        element={<FlatDeckPage />} />
           <Route path="*"                element={<NotFoundPage />} />
         </Route>
       </Routes>
