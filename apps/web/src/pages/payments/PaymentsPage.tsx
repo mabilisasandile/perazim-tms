@@ -52,7 +52,7 @@ export default function PaymentsPage() {
   const createMut = useMutation({ mutationFn:(d:FormData)=>api.post('/payments',d), onSuccess:()=>{ qc.invalidateQueries({queryKey:['payments']}); qc.invalidateQueries({queryKey:['payments-summary']}); setModalOpen(false); reset(); }});
   const markPaidMut = useMutation({ mutationFn:({id,ref}:{id:number;ref?:string})=>api.patch(`/payments/${id}/mark-paid`,{reference:ref}), onSuccess:()=>{ qc.invalidateQueries({queryKey:['payments']}); qc.invalidateQueries({queryKey:['payments-summary']}); }});
 
-  if(isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32}/></div>;
+  if(isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32}/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if(isError) return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20}/><span>Failed to load payments.</span></div>;
 
   const inp='w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';

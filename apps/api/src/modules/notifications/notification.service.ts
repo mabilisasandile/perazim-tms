@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { prisma } from '../../lib/prisma';
 import { settingsService } from '../settings/settings.service';
 
@@ -168,6 +169,15 @@ async function sendViaEmail(to: string, subject: string, html: string): Promise<
   await transporter.sendMail({ from: smtp.fromEmail, to, subject, html });
 }
 
+async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY not configured');
+  const resend = new Resend(apiKey);
+  const from = process.env.RESEND_FROM_EMAIL ?? 'Perazim TMS <noreply@perazim.com>';
+  const { error } = await resend.emails.send({ from, to, subject, html });
+  if (error) throw new Error((error as any).message ?? JSON.stringify(error));
+}
+
 async function sendViaSms(to: string, body: string): Promise<void> {
   const config = await prisma.twilioConfig.findFirst();
   if (!config || !config.enabled) throw new Error('Twilio SMS not configured or disabled');
@@ -251,17 +261,29 @@ export const notificationService = {
 
       try {
         if (channel === 'EMAIL' && email) {
-          await sendViaEmail(email, msg.subject, msg.html);
+          const provider = process.env.RESEND_API_KEY ? 'Resend' : 'SMTP';
+          console.log(`[NOTIF] ${type} | EMAIL (${provider}) → ${email}`);
+          if (process.env.RESEND_API_KEY) {
+            await sendViaResend(email, msg.subject, msg.html);
+          } else {
+            await sendViaEmail(email, msg.subject, msg.html);
+          }
+          console.log(`[NOTIF] ✓ EMAIL sent (${provider}): ${type} → ${email}`);
         } else if (channel === 'SMS' && phone) {
+          console.log(`[NOTIF] ${type} | SMS → ${phone}`);
           await sendViaSms(phone, msg.text);
+          console.log(`[NOTIF] ✓ SMS sent: ${type} → ${phone}`);
         } else if (channel === 'WHATSAPP' && phone) {
+          console.log(`[NOTIF] ${type} | WhatsApp → ${phone}`);
           await sendViaWhatsApp(phone, msg.text);
+          console.log(`[NOTIF] ✓ WhatsApp sent: ${type} → ${phone}`);
         } else {
           // No address available for this channel — skip silently
           continue;
         }
         await prisma.notification.create({ data: { ...logBase, status: 'SENT', sentAt: new Date() } });
       } catch (err: any) {
+        console.error(`[NOTIF] ✗ ${channel} failed: ${type} → ${email ?? phone ?? 'unknown'} | ${err.message ?? err}`);
         await prisma.notification.create({
           data: { ...logBase, status: 'FAILED', failureReason: err.message ?? 'Unknown error' },
         });
@@ -282,21 +304,84 @@ export const notificationService = {
 
     if (setting.smsEnabled) {
       const logBase = { type: 'OTP_NOTIFICATION', channel: 'SMS', recipientType: 'CUSTOMER', recipientPhone: phone, entityType: 'TRIP', entityId: tripId, body, subject: 'OTP' };
+      console.log(`[NOTIF] OTP_NOTIFICATION | SMS → ${phone} (trip ${trackingCode})`);
       try {
         await sendViaSms(phone, body);
+        console.log(`[NOTIF] ✓ OTP SMS sent → ${phone}`);
         await prisma.notification.create({ data: { ...logBase, status: 'SENT', sentAt: new Date() } });
       } catch (err: any) {
+        console.error(`[NOTIF] ✗ OTP SMS failed → ${phone} | ${err.message ?? err}`);
         await prisma.notification.create({ data: { ...logBase, status: 'FAILED', failureReason: err.message } });
       }
     }
     if (setting.whatsappEnabled) {
       const logBase = { type: 'OTP_NOTIFICATION', channel: 'WHATSAPP', recipientType: 'CUSTOMER', recipientPhone: phone, entityType: 'TRIP', entityId: tripId, body, subject: 'OTP' };
+      console.log(`[NOTIF] OTP_NOTIFICATION | WhatsApp → ${phone} (trip ${trackingCode})`);
       try {
         await sendViaWhatsApp(phone, body);
+        console.log(`[NOTIF] ✓ OTP WhatsApp sent → ${phone}`);
         await prisma.notification.create({ data: { ...logBase, status: 'SENT', sentAt: new Date() } });
       } catch (err: any) {
+        console.error(`[NOTIF] ✗ OTP WhatsApp failed → ${phone} | ${err.message ?? err}`);
         await prisma.notification.create({ data: { ...logBase, status: 'FAILED', failureReason: err.message } });
       }
+    }
+  },
+
+  // ─── Welcome Emails ─────────────────────────────────────────────────────────
+
+  async sendWelcomeEmail(
+    to: string,
+    name: string,
+    type: 'customer' | 'driver' | 'user',
+    role?: string,
+  ): Promise<void> {
+    if (!to) return;
+
+    const configs: Record<string, { subject: string; headline: string; body: string }> = {
+      customer: {
+        subject:  'Welcome to Perazim TMS',
+        headline: 'Welcome to Perazim TMS!',
+        body:     'Your customer account has been created successfully. You can now track your shipments and view your bookings through our portal.',
+      },
+      driver: {
+        subject:  'Welcome to the Perazim TMS Driver Team',
+        headline: 'Welcome to the Driver Team!',
+        body:     'Your driver account has been set up successfully. You will receive notifications when trips are assigned to you. Please ensure your documentation is kept up to date.',
+      },
+      user: {
+        subject:  'Your Perazim TMS Account is Ready',
+        headline: 'Your Account is Ready',
+        body:     `A <strong>${role ?? 'staff'}</strong> account has been created for you on Perazim TMS. You can log in using your username and password.`,
+      },
+    };
+
+    const cfg = configs[type];
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fff;border-radius:8px;">
+        <div style="background:#1e3a8a;padding:16px 24px;border-radius:6px 6px 0 0;margin:-24px -24px 24px;">
+          <h1 style="color:#fff;margin:0;font-size:18px;font-weight:600;">Perazim TMS</h1>
+        </div>
+        <h2 style="color:#1e3a8a;margin-top:0;">${cfg.headline}</h2>
+        <p style="color:#374151;">Dear <strong>${name}</strong>,</p>
+        <p style="color:#374151;">${cfg.body}</p>
+        <p style="color:#374151;">If you have any questions, contact your administrator or reply to this email.</p>
+        <p style="color:#9ca3af;font-size:12px;border-top:1px solid #f3f4f6;padding-top:12px;margin-top:24px;">
+          This is an automated message from Perazim TMS. Please do not reply directly to this email.
+        </p>
+      </div>`;
+
+    const provider = process.env.RESEND_API_KEY ? 'Resend' : 'SMTP';
+    console.log(`[NOTIF] Welcome email (${type}) via ${provider} → ${to}`);
+    try {
+      if (process.env.RESEND_API_KEY) {
+        await sendViaResend(to, cfg.subject, html);
+      } else {
+        await sendViaEmail(to, cfg.subject, html);
+      }
+      console.log(`[NOTIF] ✓ Welcome email sent (${provider}): ${type} → ${to}`);
+    } catch (err: any) {
+      console.error(`[NOTIF] ✗ Welcome email failed (${provider}): ${type} → ${to} | ${err.message ?? err}`);
     }
   },
 

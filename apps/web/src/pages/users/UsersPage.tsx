@@ -102,22 +102,25 @@ export default function UsersPage() {
     resolver: zodResolver(editing ? updateSchema : createSchema),
   });
 
-  const createMut  = useMutation({ mutationFn: (d: CForm) => api.post('/users', d),                           onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); close(); } });
-  const updateMut  = useMutation({ mutationFn: (d: UForm) => api.put(`/users/${editing!.id}`, d),             onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); close(); } });
+  const [formError, setFormError] = useState<string | null>(null);
+  const onMutError = (e: any) => setFormError(e?.response?.data?.error ?? 'An unexpected error occurred.');
+
+  const createMut  = useMutation({ mutationFn: (d: CForm) => api.post('/users', d),                           onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); close(); }, onError: onMutError });
+  const updateMut  = useMutation({ mutationFn: (d: UForm) => api.put(`/users/${editing!.id}`, d),             onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); close(); }, onError: onMutError });
   const deleteMut  = useMutation({ mutationFn: (id: number) => api.delete(`/users/${id}`),                    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }) });
   const permsMut   = useMutation({ mutationFn: ({ id, perms }: { id: number; perms: Record<string,boolean> }) => api.put(`/users/${id}/permissions`, perms), onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); setPermUser(null); } });
   const roleMut    = useMutation({ mutationFn: ({ id, role }: { id: number; role: string }) => api.put(`/users/${id}/role`, { role }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); setRoleUser(null); } });
   const unlockMut  = useMutation({ mutationFn: (id: number) => api.post(`/users/${id}/unlock`),               onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }) });
 
-  const openAdd  = () => { setEditing(null); reset({ name:'', email:'', username:'', password:'', role:'ADMIN', isActive:true }); setModalOpen(true); };
-  const openEdit = (u: User) => { setEditing(u); reset({ name:u.name, email:u.email, username:u.username, role:u.role as any, isActive:u.isActive, password:'' }); setModalOpen(true); };
+  const openAdd  = () => { setEditing(null); setFormError(null); reset({ name:'', email:'', username:'', password:'', role:'ADMIN', isActive:true }); setModalOpen(true); };
+  const openEdit = (u: User) => { setEditing(u); setFormError(null); reset({ name:u.name, email:u.email, username:u.username, role:u.role as any, isActive:u.isActive, password:'' }); setModalOpen(true); };
   const openPerms = (u: User) => { setPermUser(u); setLocalPerms(u.permissions ?? {}); };
   const openRole  = (u: User) => { setRoleUser(u); setRoleChoice(u.role); };
-  const close = () => { setModalOpen(false); setEditing(null); };
+  const close = () => { setModalOpen(false); setEditing(null); setFormError(null); };
 
   const isLocked = (u: User) => !!u.lockedUntil && new Date(u.lockedUntil) > new Date();
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32} /></div>;
+  if (isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (isError)   return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20} /><span>Failed to load users.</span></div>;
 
   const selectedRoleDef = roles.find(r => r.key === roleChoice);
@@ -254,6 +257,11 @@ export default function UsersPage() {
             </div>
           </div>
           <p className="text-xs text-gray-400">Default permissions for the selected role will be applied automatically.</p>
+          {formError && (
+            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertCircle size={15} className="shrink-0" />{formError}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button type="button" onClick={close} className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={isSubmitting || createMut.isPending || updateMut.isPending}

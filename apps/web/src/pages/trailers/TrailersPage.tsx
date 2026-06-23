@@ -96,6 +96,7 @@ export default function TrailersPage() {
   const [viewing,        setViewing]        = useState<Trailer | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<Category | ''>('');
   const [statusFilter,   setStatusFilter]   = useState<Status | ''>('');
+  const [formError,      setFormError]      = useState<string | null>(null);
 
   /* queries */
   const { data: trailers = [], isLoading, isError } = useQuery<Trailer[]>({
@@ -117,13 +118,17 @@ export default function TrailersPage() {
     defaultValues: { status: 'Available', isActive: true },
   });
 
+  const onMutError = (e: any) => setFormError(e?.response?.data?.error ?? 'An unexpected error occurred.');
+
   const createMut = useMutation({
     mutationFn: (d: FormData) => api.post('/trailers', prep(d)),
     onSuccess: () => { invalidate(); close(); },
+    onError: onMutError,
   });
   const updateMut = useMutation({
     mutationFn: (d: FormData) => api.put(`/trailers/${editing!.id}`, prep(d)),
     onSuccess: () => { invalidate(); close(); },
+    onError: onMutError,
   });
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: number; status: Status }) =>
@@ -149,11 +154,13 @@ export default function TrailersPage() {
 
   const openAdd = () => {
     setEditing(null);
+    setFormError(null);
     reset({ registrationNo: '', status: 'Available', isActive: true });
     setModalOpen(true);
   };
   const openEdit = (t: Trailer) => {
     setEditing(t);
+    setFormError(null);
     reset({
       registrationNo:    t.registrationNo,
       make:              t.make              ?? '',
@@ -169,7 +176,7 @@ export default function TrailersPage() {
     });
     setModalOpen(true);
   };
-  const close = () => { setModalOpen(false); setEditing(null); };
+  const close = () => { setModalOpen(false); setEditing(null); setFormError(null); };
 
   /* filtered list */
   const displayed = trailers.filter(t =>
@@ -177,7 +184,7 @@ export default function TrailersPage() {
     (!statusFilter   || t.status   === statusFilter)
   );
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32} /></div>;
+  if (isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (isError)   return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20}/><span>Failed to load trailers.</span></div>;
 
   return (
@@ -397,6 +404,11 @@ export default function TrailersPage() {
             </div>
           </div>
 
+          {formError && (
+            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertCircle size={15} className="shrink-0" />{formError}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button type="button" onClick={close} className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
             <button type="submit" disabled={isSubmitting || createMut.isPending || updateMut.isPending}

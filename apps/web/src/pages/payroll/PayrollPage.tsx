@@ -222,7 +222,7 @@ function EntryDetailModal({ entryId, open, onClose, currency }: {
 
   if (!entry) return (
     <Modal title="Payroll Entry" open={open} onClose={onClose} width="max-w-3xl">
-      {isLoading && <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-brand-600"/></div>}
+      {isLoading && <div className="flex flex-col items-center justify-center py-12 gap-3"><Loader2 size={24} className="animate-spin text-brand-600"/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>}
     </Modal>
   );
 
@@ -413,7 +413,7 @@ function SettingsTab() {
 
   const merged = { ...settings, ...sf };
 
-  if (sLoad) return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-brand-600"/></div>;
+  if (sLoad) return <div className="flex flex-col items-center justify-center py-12 gap-3"><Loader2 size={24} className="animate-spin text-brand-600"/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
 
   return (
     <div className="space-y-6">
@@ -899,7 +899,7 @@ export default function PayrollPage() {
       </div>
 
       {/* loading / error */}
-      {isLoading && <div className="flex justify-center py-12"><Loader2 size={28} className="animate-spin text-brand-600"/></div>}
+      {isLoading && <div className="flex flex-col items-center justify-center py-12 gap-3"><Loader2 size={28} className="animate-spin text-brand-600"/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>}
       {isError   && <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={18}/> Failed to load payroll data.</div>}
 
       {!isLoading && !isError && (

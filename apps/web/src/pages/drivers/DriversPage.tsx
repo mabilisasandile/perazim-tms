@@ -41,9 +41,22 @@ interface Driver {
   id: number;
   name: string;
   mobile: string;
+  alternativePhone: string | null;
   email: string;
+  idNumber: string | null;
+  nationality: string | null;
+  age: number | null;
+  bloodGroup: string | null;
+  address: string | null;
   licenseNo: string;
+  licenseType: string | null;
   licenseExpiry: string | null;
+  pdpNumber: string | null;
+  pdpExpiry: string | null;
+  totalExperience: string | null;
+  dateOfJoining: string | null;
+  reference: string | null;
+  notes: string | null;
   isActive: boolean;
   assignedVehicle: { id: number; name: string; registrationNo: string } | null;
   assignedTrailer: { id: number; registrationNo: string } | null;
@@ -53,14 +66,22 @@ interface Driver {
 const schema = z.object({
   name:             z.string().min(1, 'Name is required'),
   mobile:           z.string().min(1, 'Mobile is required'),
+  alternativePhone: z.string().optional(),
   email:            z.string().email('Valid email required'),
+  idNumber:         z.string().optional(),
+  nationality:      z.string().optional(),
   age:              z.coerce.number().int().positive().optional(),
+  bloodGroup:       z.string().optional(),
   address:          z.string().optional(),
   licenseNo:        z.string().min(1, 'License number is required'),
+  licenseType:      z.string().optional(),
   licenseExpiry:    z.string().optional(),
+  pdpNumber:        z.string().optional(),
+  pdpExpiry:        z.string().optional(),
   dateOfJoining:    z.string().optional(),
   totalExperience:  z.string().optional(),
   reference:        z.string().optional(),
+  notes:            z.string().optional(),
   isActive:         z.boolean().default(true),
   assignedVehicleId: z.coerce.number().optional().nullable(),
   assignedTrailerId: z.coerce.number().optional().nullable(),
@@ -121,11 +142,28 @@ export default function DriversPage() {
 
   const openEdit = (d: Driver) => {
     setEditing(d);
+    const toDate = (v: string | null | undefined) =>
+      typeof v === 'string' ? v.split('T')[0] : '';
     reset({
-      name: d.name, mobile: d.mobile, email: d.email,
-      licenseNo: d.licenseNo, isActive: d.isActive,
-      // guard: split only if it's a truthy string
-      licenseExpiry: typeof d.licenseExpiry === 'string' ? d.licenseExpiry.split('T')[0] : '',
+      name:             d.name,
+      mobile:           d.mobile,
+      alternativePhone: d.alternativePhone  ?? '',
+      email:            d.email,
+      idNumber:         d.idNumber          ?? '',
+      nationality:      d.nationality       ?? '',
+      age:              d.age               ?? undefined,
+      bloodGroup:       d.bloodGroup        ?? '',
+      address:          d.address           ?? '',
+      licenseNo:        d.licenseNo,
+      licenseType:      d.licenseType       ?? '',
+      licenseExpiry:    toDate(d.licenseExpiry),
+      pdpNumber:        d.pdpNumber         ?? '',
+      pdpExpiry:        toDate(d.pdpExpiry),
+      dateOfJoining:    toDate(d.dateOfJoining),
+      totalExperience:  d.totalExperience   ?? '',
+      reference:        d.reference         ?? '',
+      notes:            d.notes             ?? '',
+      isActive:         d.isActive,
       assignedVehicleId: d.assignedVehicle?.id ?? null,
       assignedTrailerId: d.assignedTrailer?.id ?? null,
     });
@@ -134,7 +172,7 @@ export default function DriversPage() {
 
   const closeModal = () => { setModalOpen(false); setEditing(null); };
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32} /></div>;
+  if (isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (isError) return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20} /><span>Failed to load drivers.</span></div>;
 
   return (
@@ -203,53 +241,152 @@ export default function DriversPage() {
       </div>
 
       <Modal title={editing ? 'Edit Driver' : 'Add Driver'} open={modalOpen} onClose={closeModal} width="max-w-2xl">
-        <form onSubmit={handleSubmit(d => editing ? updateMut.mutate(d) : createMut.mutate(d))} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: 'Full Name *', field: 'name', placeholder: 'e.g. John Doe' },
-              { label: 'Mobile *', field: 'mobile', placeholder: '+27 82 000 0000' },
-              { label: 'Email *', field: 'email', placeholder: 'driver@email.com' },
-              { label: 'Age', field: 'age', placeholder: '35' },
-              { label: 'License Number *', field: 'licenseNo', placeholder: '' },
-              { label: 'License Expiry', field: 'licenseExpiry', type: 'date' },
-              { label: 'Date of Joining', field: 'dateOfJoining', type: 'date' },
-              { label: 'Total Experience', field: 'totalExperience', placeholder: 'e.g. 5 years' },
-              { label: 'Reference', field: 'reference', placeholder: '' },
-            ].map(({ label, field, placeholder, type }) => (
-              <div key={field}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                <input type={type ?? 'text'} {...register(field as keyof FormData)} placeholder={placeholder}
+        <form onSubmit={handleSubmit(d => editing ? updateMut.mutate(d) : createMut.mutate(d))} className="space-y-5">
+          {/* Personal Details */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Personal Details</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <input {...register('name')} placeholder="e.g. John Doe"
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-                {errors[field as keyof FormData] && (
-                  <p className="text-red-500 text-xs mt-1">{(errors[field as keyof FormData] as any)?.message}</p>
-                )}
+                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
               </div>
-            ))}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assign Vehicle</label>
-              <select {...register('assignedVehicleId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="">No vehicle</option>
-                {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registrationNo})</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assign Trailer</label>
-              <select {...register('assignedTrailerId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="">No trailer</option>
-                {trailers.map(t => <option key={t.id} value={t.id}>{t.registrationNo}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <textarea {...register('address')} rows={2}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <input type="checkbox" {...register('isActive')} id="driverActive" className="rounded" />
-              <label htmlFor="driverActive" className="text-sm font-medium text-gray-700">Active</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ID / Passport Number</label>
+                <input {...register('idNumber')} placeholder="SA ID or passport"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nationality</label>
+                <input {...register('nationality')} placeholder="e.g. South African"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                <input type="number" {...register('age')} placeholder="35"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Blood Group</label>
+                <select {...register('bloodGroup')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Select</option>
+                  {['A+','A−','B+','B−','AB+','AB−','O+','O−'].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Joining</label>
+                <input type="date" {...register('dateOfJoining')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+
+          {/* Contact */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contact</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mobile *</label>
+                <input {...register('mobile')} placeholder="+27 82 000 0000"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Alternative Phone</label>
+                <input {...register('alternativePhone')} placeholder="+27 83 000 0000"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input type="email" {...register('email')} placeholder="driver@email.com"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <textarea {...register('address')} rows={2}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Licence & Compliance */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Licence &amp; Compliance</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">License Number *</label>
+                <input {...register('licenseNo')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                {errors.licenseNo && <p className="text-red-500 text-xs mt-1">{errors.licenseNo.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">License Type / Code</label>
+                <select {...register('licenseType')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Select</option>
+                  {['Code 8','Code 10','Code 14','EB','EC','EC1'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">License Expiry</label>
+                <input type="date" {...register('licenseExpiry')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PDP Number</label>
+                <input {...register('pdpNumber')} placeholder="Professional Driving Permit"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PDP Expiry</label>
+                <input type="date" {...register('pdpExpiry')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Employment */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Employment</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Experience</label>
+                <input {...register('totalExperience')} placeholder="e.g. 5 years"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                <input {...register('reference')}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign Vehicle</label>
+                <select {...register('assignedVehicleId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">No vehicle</option>
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registrationNo})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign Trailer</label>
+                <select {...register('assignedTrailerId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">No trailer</option>
+                  {trailers.map(t => <option key={t.id} value={t.id}>{t.registrationNo}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea {...register('notes')} rows={2} placeholder="Special conditions, restrictions, etc."
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input type="checkbox" {...register('isActive')} id="driverActive" className="rounded" />
+                <label htmlFor="driverActive" className="text-sm font-medium text-gray-700">Active</label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
             <button type="submit" disabled={isSubmitting || createMut.isPending || updateMut.isPending}
               className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg disabled:opacity-60">
@@ -260,28 +397,96 @@ export default function DriversPage() {
       </Modal>
 
       {viewDriver && (
-        <Modal title={viewDriver.name} open={!!viewDriver} onClose={() => setViewDriver(null)}>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {([
-              ['Email', viewDriver.email],
-              ['Mobile', viewDriver.mobile],
-              ['License No', viewDriver.licenseNo],
-              ['License Expiry', safeDate(viewDriver.licenseExpiry, 'dd MMM yyyy')],
-              ['Assigned Vehicle', viewDriver.assignedVehicle ? `${viewDriver.assignedVehicle.name} (${viewDriver.assignedVehicle.registrationNo})` : '—'],
-              ['Assigned Trailer', viewDriver.assignedTrailer?.registrationNo ?? '—'],
-              ['Total Trips', viewDriver._count?.trips ?? 0],
-              ['Status', viewDriver.isActive ? 'Active' : 'Inactive'],
-            ] as [string, React.ReactNode][]).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-gray-500">{label}</p>
-                <p className="font-medium">{value}</p>
+        <Modal title={viewDriver.name} open={!!viewDriver} onClose={() => setViewDriver(null)} width="max-w-2xl">
+          <div className="space-y-5 text-sm">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Personal Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['ID / Passport', viewDriver.idNumber],
+                  ['Nationality',   viewDriver.nationality],
+                  ['Age',           viewDriver.age],
+                  ['Blood Group',   viewDriver.bloodGroup],
+                  ['Date of Joining', safeDate(viewDriver.dateOfJoining, 'dd MMM yyyy')],
+                  ['Status',        viewDriver.isActive ? 'Active' : 'Inactive'],
+                ] as [string, React.ReactNode][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-gray-500">{label}</p>
+                    <p className="font-medium">{value ?? '—'}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contact</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['Mobile',        viewDriver.mobile],
+                  ['Alt. Phone',    viewDriver.alternativePhone],
+                  ['Email',         viewDriver.email],
+                ] as [string, React.ReactNode][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-gray-500">{label}</p>
+                    <p className="font-medium">{value ?? '—'}</p>
+                  </div>
+                ))}
+                {viewDriver.address && (
+                  <div className="col-span-2">
+                    <p className="text-gray-500">Address</p>
+                    <p className="font-medium">{viewDriver.address}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Licence &amp; Compliance</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['License No',     viewDriver.licenseNo],
+                  ['License Type',   viewDriver.licenseType],
+                  ['License Expiry', safeDate(viewDriver.licenseExpiry, 'dd MMM yyyy')],
+                  ['PDP Number',     viewDriver.pdpNumber],
+                  ['PDP Expiry',     safeDate(viewDriver.pdpExpiry, 'dd MMM yyyy')],
+                ] as [string, React.ReactNode][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-gray-500">{label}</p>
+                    <p className="font-medium">{value ?? '—'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Employment</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['Experience',       viewDriver.totalExperience],
+                  ['Reference',        viewDriver.reference],
+                  ['Assigned Vehicle', viewDriver.assignedVehicle ? `${viewDriver.assignedVehicle.name} (${viewDriver.assignedVehicle.registrationNo})` : '—'],
+                  ['Assigned Trailer', viewDriver.assignedTrailer?.registrationNo ?? '—'],
+                  ['Total Trips',      viewDriver._count?.trips ?? 0],
+                ] as [string, React.ReactNode][]).map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-gray-500">{label}</p>
+                    <p className="font-medium">{value ?? '—'}</p>
+                  </div>
+                ))}
+              </div>
+              {viewDriver.notes && (
+                <div className="mt-3">
+                  <p className="text-gray-500">Notes</p>
+                  <p className="font-medium whitespace-pre-wrap">{viewDriver.notes}</p>
+                </div>
+              )}
+            </div>
           </div>
+
           <div className="pt-4 border-t mt-4">
             <button onClick={() => { setViewDriver(null); setDocsDriverId(viewDriver.id); }}
               className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium">
-              <FolderOpen size={15}/> Open Documents & Profile
+              <FolderOpen size={15}/> Open Documents &amp; Profile
             </button>
           </div>
         </Modal>

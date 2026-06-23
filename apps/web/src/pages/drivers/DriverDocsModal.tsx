@@ -715,8 +715,9 @@ export default function DriverDocsModal({ driverId, open, onClose }: {
   return (
     <Modal title="Driver Profile" open={open} onClose={onClose} width="max-w-3xl">
       {isLoading && (
-        <div className="flex justify-center py-12">
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 size={28} className="animate-spin text-brand-600"/>
+          <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
         </div>
       )}
       {isError && (

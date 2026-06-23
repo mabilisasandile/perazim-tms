@@ -32,7 +32,7 @@ export const dashboardService = {
         where: { type: 'EXPENSE', date: { gte: todayStart, lte: todayEnd } },
         _sum: { amount: true },
       }),
-      // Latest trip per vehicle (vehicle status overview)
+      // Latest trip per vehicle — ROW_NUMBER() avoids LIMIT inside correlated subquery (TiDB-compatible)
       prisma.$queryRaw<
         {
           vehicleName: string;
@@ -45,16 +45,17 @@ export const dashboardService = {
         SELECT
           v.name         AS vehicleName,
           v.registrationNo,
-          t.status,
-          t.fromLocation,
-          t.toLocation
+          latest.status,
+          latest.fromLocation,
+          latest.toLocation
         FROM vehicles v
-        LEFT JOIN trips t ON t.id = (
-          SELECT id FROM trips WHERE vehicleId = v.id
-          ORDER BY createdAt DESC LIMIT 1
-        )
-        WHERE v.isActive = true
-        ORDER BY t.status
+        LEFT JOIN (
+          SELECT vehicleId, status, fromLocation, toLocation,
+                 ROW_NUMBER() OVER (PARTITION BY vehicleId ORDER BY createdAt DESC) AS rn
+          FROM trips
+        ) latest ON latest.vehicleId = v.id AND latest.rn = 1
+        WHERE v.isActive = TRUE
+        ORDER BY latest.status
         LIMIT 20
       `,
     ]);

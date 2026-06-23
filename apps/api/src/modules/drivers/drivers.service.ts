@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { CreateDriverDto, UpdateDriverDto } from './drivers.schema';
 import bcrypt from 'bcryptjs';
+import { notificationService } from '../notifications/notification.service';
 
 export const driversService = {
   async findAll() {
@@ -30,25 +31,31 @@ export const driversService = {
   },
 
   async create(data: CreateDriverDto) {
-    const { licenseExpiry, dateOfJoining, ...rest } = data;
-    return prisma.driver.create({
+    const { licenseExpiry, dateOfJoining, pdpExpiry, ...rest } = data;
+    const driver = await prisma.driver.create({
       data: {
         ...rest,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
         dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
+        pdpExpiry:     pdpExpiry     ? new Date(pdpExpiry)     : null,
       },
     });
+    if (driver.email) {
+      notificationService.sendWelcomeEmail(driver.email, driver.name, 'driver').catch(() => {});
+    }
+    return driver;
   },
 
   async update(id: number, data: UpdateDriverDto) {
     await this.findById(id);
-    const { licenseExpiry, dateOfJoining, ...rest } = data;
+    const { licenseExpiry, dateOfJoining, pdpExpiry, ...rest } = data;
     return prisma.driver.update({
       where: { id },
       data: {
         ...rest,
         ...(licenseExpiry !== undefined && { licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null }),
         ...(dateOfJoining !== undefined && { dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null }),
+        ...(pdpExpiry     !== undefined && { pdpExpiry:     pdpExpiry     ? new Date(pdpExpiry)     : null }),
       },
     });
   },

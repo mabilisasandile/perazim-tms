@@ -268,8 +268,9 @@ export default function InvoicesPage() {
     inv.depositRequired ? Math.max(0, Number(inv.depositRequired) - Number(inv.depositPaid)) : null;
 
   if (isLoading) return (
-    <div className="flex items-center justify-center h-64">
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
       <Loader2 className="animate-spin text-brand-600" size={32} />
+      <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
     </div>
   );
   if (isError) return (
@@ -821,7 +822,7 @@ function PaymentHistoryPanel({ invoiceId }: { invoiceId: number }) {
     queryFn: () => api.get(`/invoices/${invoiceId}/payments`).then(r => normalizeList(r.data)),
   });
 
-  if (isLoading) return <div className="flex justify-center py-6"><Loader2 className="animate-spin" size={20} /></div>;
+  if (isLoading) return <div className="flex flex-col items-center justify-center py-6 gap-2"><Loader2 className="animate-spin" size={20} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (payments.length === 0) return <p className="text-sm text-gray-400 text-center py-6">No payments recorded yet.</p>;
 
   return (

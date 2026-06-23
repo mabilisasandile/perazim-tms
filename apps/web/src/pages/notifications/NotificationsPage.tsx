@@ -187,7 +187,7 @@ function LogTab() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-600" size={24} /></div>
+          <div className="flex flex-col items-center justify-center py-10 gap-3"><Loader2 className="animate-spin text-blue-600" size={24} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
         ) : logs.length === 0 ? (
           <div className="text-center py-10 text-gray-400">
             <Bell size={36} className="mx-auto mb-2 opacity-40" />

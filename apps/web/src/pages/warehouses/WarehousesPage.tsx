@@ -249,7 +249,7 @@ export default function WarehousesPage() {
 
       {/* ── DASHBOARD TAB ──────────────────────────────────────── */}
       {tab === 'dashboard' && (
-        dbLoading ? <div className="flex justify-center h-40 items-center"><Loader2 className="animate-spin text-brand-600" size={28} /></div> :
+        dbLoading ? <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div> :
         dashboard ? (
           <div className="space-y-6">
             {/* Stat cards */}
@@ -331,7 +331,7 @@ export default function WarehousesPage() {
 
       {/* ── WAREHOUSES TAB ─────────────────────────────────────── */}
       {tab === 'warehouses' && (
-        whLoading ? <div className="flex justify-center h-40 items-center"><Loader2 className="animate-spin text-brand-600" size={28} /></div> : (
+        whLoading ? <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {warehouses.length === 0 && (
               <div className="col-span-3 text-center py-16 text-gray-400">No warehouses yet. Add your first one.</div>
@@ -400,7 +400,7 @@ export default function WarehousesPage() {
             ))}
           </div>
 
-          {wvLoading ? <div className="flex justify-center h-40 items-center"><Loader2 className="animate-spin text-brand-600" size={28} /></div> : (
+          {wvLoading ? <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div> : (
             <div className="bg-white rounded-xl border overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

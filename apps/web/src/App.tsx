@@ -3,6 +3,7 @@ import { useAuthStore } from './stores/authStore';
 import { useCustomerAuthStore } from './stores/customerAuthStore';
 import { useDriverAuthStore }   from './stores/driverAuthStore';
 import { useEffect } from 'react';
+import { GoogleMapsProvider } from './components/maps/GoogleMapsProvider';
 
 import DashboardLayout     from './components/layout/DashboardLayout';
 import CustomerPortalPage  from './pages/customer/CustomerPortalPage';
@@ -42,13 +43,15 @@ import NotificationsPage    from './pages/notifications/NotificationsPage';
 import ReportingPage        from './pages/reporting/ReportingPage';
 import FuelTankerPage       from './pages/fuel-tanker/FuelTankerPage';
 import FlatDeckPage         from './pages/flat-deck/FlatDeckPage';
+import FleetMapPage         from './pages/fleet-map/FleetMapPage';
+import GeofencesPage        from './pages/geofences/GeofencesPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const user      = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
 
   if (isLoading) return null; // wait for session check before deciding
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  return user ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 function CustomerRoute({ children }: { children: React.ReactNode }) {
@@ -80,6 +83,7 @@ export default function App() {
   useEffect(() => { fetchMe(); }, [fetchMe]);
 
   return (
+    <GoogleMapsProvider>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route
@@ -130,9 +134,12 @@ export default function App() {
           <Route path="reporting"        element={<ReportingPage />} />
           <Route path="fuel-tanker"      element={<FuelTankerPage />} />
           <Route path="flat-deck"        element={<FlatDeckPage />} />
+          <Route path="fleet-map"        element={<FleetMapPage />} />
+          <Route path="geofences"        element={<GeofencesPage />} />
           <Route path="*"                element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
+    </GoogleMapsProvider>
   );
 }

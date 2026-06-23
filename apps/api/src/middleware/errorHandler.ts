@@ -31,9 +31,19 @@ export const errorHandler = (
   // Prisma unique constraint
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
-      const field = (err.meta?.target as string[])?.join(', ');
+      const fieldMap: Record<string, string> = {
+        email: 'email address',
+        username: 'username',
+        registrationNo: 'registration number',
+        registration_no: 'registration number',
+        name: 'name',
+        loadSheetNo: 'load sheet number',
+        load_sheet_no: 'load sheet number',
+      };
+      const raw = (err.meta?.target as string[]) ?? [];
+      const readable = raw.map(f => fieldMap[f] ?? f).join(', ');
       return res.status(409).json({
-        error: `A record with this ${field} already exists.`,
+        error: `A record with this ${readable} already exists.`,
       });
     }
     if (err.code === 'P2025') {

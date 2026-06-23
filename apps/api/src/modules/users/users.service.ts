@@ -3,6 +3,7 @@ import { AppError } from '../../middleware/errorHandler';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ROLE_KEYS, ROLE_PERMISSIONS, isValidRole } from '../../lib/roles';
+import { notificationService } from '../notifications/notification.service';
 
 const permissionsSchema = z.object({
   vehicleList:        z.boolean().optional(),
@@ -112,6 +113,9 @@ export const usersService = {
       include: { permissions: true },
     });
     const { password: __, ...safe } = user;
+    if (safe.email) {
+      notificationService.sendWelcomeEmail(safe.email, safe.name, 'user', safe.role).catch(() => {});
+    }
     return safe;
   },
 

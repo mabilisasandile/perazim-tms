@@ -7,6 +7,7 @@ import {
   Clock, XCircle, AlertCircle, Loader2, Navigation,
   Package, Info,
 } from 'lucide-react';
+import RouteMap from '../../components/maps/RouteMap';
 
 interface TrackingTrip {
   id: number;
@@ -74,8 +75,9 @@ export default function TrackingPage() {
   }, [code]);
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
       <Loader2 className="animate-spin text-brand-600" size={36} />
+      <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
     </div>
   );
 
@@ -203,6 +205,18 @@ export default function TrackingPage() {
               )}
             </div>
           </Card>
+        )}
+
+        {/* Route map — always shown when positions exist */}
+        {trip.positions.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <Navigation size={16} className="text-brand-600" />
+              <h3 className="text-sm font-semibold text-gray-700">Route Map</h3>
+              <span className="ml-auto text-xs text-gray-400">{trip.positions.length} point{trip.positions.length !== 1 ? 's' : ''} recorded</span>
+            </div>
+            <RouteMap positions={trip.positions} height="280px" />
+          </div>
         )}
 
         {/* Legs */}

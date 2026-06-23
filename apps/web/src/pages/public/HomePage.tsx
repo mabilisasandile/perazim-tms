@@ -280,6 +280,7 @@ export default function HomePage() {
                     <a href="#">Contact Us</a>
                     <a href="#">Terms of Use</a>
                     <a href="#">Privacy Policy</a>
+                    <a href="/login">Admin</a>
                 </div>
 
                 <div className="text-center mt-4 text-gray-400 text-sm">

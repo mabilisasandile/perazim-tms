@@ -167,7 +167,7 @@ export default function SettingsPage() {
   });
 
   if (loadingSettings || loadingSmtp) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32} /></div>;
+    return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   }
 
   return (

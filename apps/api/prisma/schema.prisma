@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+  relationMode = "prisma" // Crucial for TiDB compatibility
 }
 
 // ─────────────────────────────────────────────
@@ -91,8 +92,13 @@ model Customer {
   name             String
   email            String   @unique
   phone            String?
+  alternativePhone String?
   address          String?  @db.Text
-  password         String? // bcrypt hashed — for customer portal login
+  companyName      String?
+  vatNumber        String?
+  contactPerson    String?
+  notes            String?  @db.Text
+  password         String?
   resetToken       String?
   isActive         Boolean  @default(true)
   payLaterApproved Boolean  @default(false)
@@ -142,7 +148,7 @@ model Vehicle {
   geofenceEvents    GeofenceEvent[]
   reminders         Reminder[]
   incomeExpenses    IncomeExpense[]
-  loadSheets        LoadSheet[]
+  carrierLoadSheets TruckLoadSheet[]  @relation("TruckCarrierLoadSheets")
   assignedTrailers  Trailer[]         @relation("VehicleAssignedTrailers")
   flatDeckJobs      FlatDeckJob[]     @relation("FlatDeckVehicle")
 
@@ -171,10 +177,10 @@ model Trailer {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  drivers       Driver[]
-  trips         Trip[]
-  loadSheets    LoadSheet[]
-  flatDeckJobs  FlatDeckJob[]
+  drivers         Driver[]
+  trips           Trip[]
+  truckLoadSheets TruckLoadSheet[]  @relation("TruckLoadSheetTrailers")
+  flatDeckJobs    FlatDeckJob[]
 
   @@map("trailers")
 }
@@ -188,14 +194,22 @@ model Driver {
   name              String
   mobile            String
   email             String    @unique
+  alternativePhone  String?
+  idNumber          String?
+  nationality       String?
   age               Int?
+  bloodGroup        String?
   address           String?   @db.Text
   licenseNo         String
+  licenseType       String?
   licenseExpiry     DateTime?
+  pdpNumber         String?
+  pdpExpiry         DateTime?
   totalExperience   String?
   dateOfJoining     DateTime?
   reference         String?
-  password          String? // bcrypt hashed — for driver app login
+  notes             String?   @db.Text
+  password          String?
   resetToken        String?
   isActive          Boolean   @default(true)
   assignedVehicleId Int?
@@ -209,7 +223,7 @@ model Driver {
   tripLegs         TripLeg[]
   fuel             Fuel[]
   timesheets       Timesheet[]
-  loadSheets       LoadSheet[]
+  truckLoadSheets  TruckLoadSheet[]  @relation("TruckLoadSheetDrivers")
   driverExpenses   DriverExpense[]
   inspections      Inspection[]
   inspectionImages InspectionImage[]
@@ -303,8 +317,9 @@ model Trip {
   proofOfDelivery     ProofOfDelivery?
   deliveryOtp         DeliveryOtp?
   customerCollection  CustomerCollection?
-  payrollLinks        PayrollTripLink[]
-  invoices            Invoice[]
+  payrollLinks          PayrollTripLink[]
+  invoices              Invoice[]
+  loadSheetVehicle      TruckLoadSheetVehicle?  @relation("TripLoadSheetVehicle")
 
   @@map("trips")
 }
@@ -660,20 +675,63 @@ model InspectionImage {
 // LOAD SHEETS
 // ─────────────────────────────────────────────
 
-model LoadSheet {
-  id        Int      @id @default(autoincrement())
-  driverId  Int
-  driver    Driver   @relation(fields: [driverId], references: [id])
-  vehicleId Int
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
-  trailerId Int?
-  trailer   Trailer? @relation(fields: [trailerId], references: [id])
-  data      Json // flexible load data
-  notes     String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum TruckLoadSheetStatus {
+  OPEN
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
 
-  @@map("load_sheets")
+enum TruckLoadSheetVehicleStatus {
+  YET_TO_START
+  ONGOING
+  COMPLETED
+}
+
+model TruckLoadSheet {
+  id           Int                    @id @default(autoincrement())
+  loadSheetNo  String                 @unique
+  truckId      Int
+  truck        Vehicle                @relation("TruckCarrierLoadSheets", fields: [truckId], references: [id])
+  trailerId    Int?
+  trailer      Trailer?               @relation("TruckLoadSheetTrailers", fields: [trailerId], references: [id])
+  driverId     Int
+  driver       Driver                 @relation("TruckLoadSheetDrivers", fields: [driverId], references: [id])
+  route        String
+  capacity     Int
+  status       TruckLoadSheetStatus   @default(OPEN)
+  notes        String?                @db.Text
+  dispatchedAt DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  vehicles TruckLoadSheetVehicle[]
+
+  @@index([truckId])
+  @@index([driverId])
+  @@index([status])
+  @@map("truck_load_sheets")
+}
+
+model TruckLoadSheetVehicle {
+  id               Int                         @id @default(autoincrement())
+  loadSheetId      Int
+  loadSheet        TruckLoadSheet              @relation(fields: [loadSheetId], references: [id], onDelete: Cascade)
+  tripId           Int                         @unique
+  trip             Trip                        @relation("TripLoadSheetVehicle", fields: [tripId], references: [id])
+  pickupLocation   String
+  deliveryLocation String
+  vehicleCondition String?
+  status           TruckLoadSheetVehicleStatus @default(YET_TO_START)
+  assignedAt       DateTime                    @default(now())
+  pickedUpAt       DateTime?
+  deliveredAt      DateTime?
+
+  @@index([loadSheetId])
+  @@index([status])
+  @@map("truck_load_sheet_vehicles")
 }
 
 // ─────────────────────────────────────────────

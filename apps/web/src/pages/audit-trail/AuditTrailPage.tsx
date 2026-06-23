@@ -159,8 +159,9 @@ export default function AuditTrailPage() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
           <Loader2 className="animate-spin text-brand-600" size={32} />
+          <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
         </div>
       ) : isError ? (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl">

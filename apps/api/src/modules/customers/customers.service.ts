@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { CreateCustomerDto, UpdateCustomerDto } from './customers.schema';
 import bcrypt from 'bcryptjs';
+import { notificationService } from '../notifications/notification.service';
 
 export const customersService = {
   async findAll() {
@@ -38,10 +39,14 @@ export const customersService = {
   },
 
   async create(data: CreateCustomerDto) {
-    return prisma.customer.create({
+    const customer = await prisma.customer.create({
       data,
       include: { _count: { select: { trips: true, quotations: true } } },
     });
+    if (customer.email) {
+      notificationService.sendWelcomeEmail(customer.email, customer.name, 'customer').catch(() => {});
+    }
+    return customer;
   },
 
   async update(id: number, data: UpdateCustomerDto) {

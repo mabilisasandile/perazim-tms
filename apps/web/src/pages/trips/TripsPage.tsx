@@ -1,10 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon, QrCode, ShieldCheck, ShieldAlert, Send, KeyRound, AlertTriangle } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Eye, Trash2, CheckCircle2, Clock, XCircle, TruckIcon, QrCode, ShieldCheck, ShieldAlert, Send, KeyRound, AlertTriangle, Navigation } from 'lucide-react';
+import PlacesAutocompleteInput from '../../components/maps/PlacesAutocompleteInput';
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return Math.round(R * 2 * Math.asin(Math.sqrt(h)));
+}
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import QRCodeModal from '../../components/ui/QRCodeModal';
@@ -33,9 +44,19 @@ interface Trip {
   trailer: { id: number; registrationNo: string } | null;
 }
 
-interface SelectOption { id: number; name: string; }
+interface SelectOption { id: number; name: string; email?: string; phone?: string; address?: string; companyName?: string; contactPerson?: string; }
 interface VehicleOption { id: number; name: string; registrationNo: string; }
 interface DriverOption { id: number; name: string; assignedVehicle?: { name: string } | null; }
+interface QuotationOption {
+  id: number;
+  number: string | null;
+  status: string;
+  pickup: string;
+  dropoff: string;
+  pickupDate: string | null;
+  dropoffDate: string | null;
+  items: { description: string; colour: string | null; registration: string | null; total: number }[];
+}
 
 const schema = z.object({
   customerId:   z.coerce.number().int().positive('Customer is required'),
@@ -90,7 +111,15 @@ export default function TripsPage() {
 
   const { data: customers = [] } = useQuery<SelectOption[]>({
     queryKey: ['customers-select'],
-    queryFn: () => api.get('/customers').then(r => r.data.map((c: any) => ({ id: c.id, name: c.name }))),
+    queryFn: () => api.get('/customers').then(r => r.data.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      address: c.address,
+      companyName: c.companyName,
+      contactPerson: c.contactPerson,
+    }))),
   });
   const { data: vehicles = [] } = useQuery<VehicleOption[]>({
     queryKey: ['vehicles-select'],
@@ -105,16 +134,95 @@ export default function TripsPage() {
     queryFn: () => api.get('/trailers').then(r => r.data.filter((t: any) => t.isActive).map((t: any) => ({ id: t.id, name: t.registrationNo }))),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(null);
+  const [fromCoords, setFromCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [toCoords,   setToCoords]   = useState<{ lat: number; lng: number } | null>(null);
+
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+
+  const watchedCustomerId  = watch('customerId');
+  const fromLocationValue  = watch('fromLocation') ?? '';
+  const toLocationValue    = watch('toLocation')   ?? '';
+
+  const estimatedDistance = fromCoords && toCoords ? haversineKm(fromCoords, toCoords) : null;
+  const selectedCustomer = customers.find(c => c.id === Number(watchedCustomerId));
+
+  const { data: customerQuotations = [], isFetching: quotationsFetching } = useQuery<QuotationOption[]>({
+    queryKey: ['customer-quotations', watchedCustomerId],
+    queryFn: () => api.get('/quotations', { params: { customerId: watchedCustomerId } })
+      .then(r => r.data.filter((q: any) => !q.isConverted && q.status !== 'DECLINED' && q.status !== 'CONVERTED')),
+    enabled: !!watchedCustomerId && Number(watchedCustomerId) > 0,
+  });
+
+  const selectedQuotation = customerQuotations.find(q => q.id === selectedQuotationId) ?? null;
+
+  // Reset coords when quotation pre-fills the location fields
+  useEffect(() => {
+    setFromCoords(null);
+    setToCoords(null);
+  }, [selectedQuotationId]);
+
+  // When customer changes: clear auto-filled fields and reset quotation selection
+  useEffect(() => {
+    setSelectedQuotationId(null);
+    setValue('fromLocation', selectedCustomer?.address ?? '');
+    setValue('toLocation', '');
+    setValue('startDate', '');
+    setValue('endDate', '');
+    setValue('amount', undefined);
+    setValue('customerVehicleMake', '');
+    setValue('customerVehicleColour', '');
+    setValue('customerVehicleRegistration', '');
+    setValue('vehicleCondition', null);
+  }, [watchedCustomerId]);
+
+  // Auto-select the best quotation once the list loads
+  useEffect(() => {
+    if (!customerQuotations.length) { setSelectedQuotationId(null); return; }
+    const best =
+      customerQuotations.find(q => q.status === 'ACCEPTED') ??
+      customerQuotations.find(q => q.status === 'SENT') ??
+      customerQuotations[0];
+    setSelectedQuotationId(best?.id ?? null);
+  }, [customerQuotations]);
+
+  // Populate trip form from the selected quotation
+  useEffect(() => {
+    if (!selectedQuotation) {
+      // Fall back to customer address when quotation is deselected
+      setValue('fromLocation', selectedCustomer?.address ?? '');
+      setValue('toLocation', '');
+      setValue('startDate', '');
+      setValue('endDate', '');
+      setValue('amount', undefined);
+      setValue('customerVehicleMake', '');
+      setValue('customerVehicleColour', '');
+      setValue('customerVehicleRegistration', '');
+      setValue('vehicleCondition', null);
+      return;
+    }
+    setValue('fromLocation', selectedQuotation.pickup);
+    setValue('toLocation', selectedQuotation.dropoff);
+    if (selectedQuotation.pickupDate)  setValue('startDate', selectedQuotation.pickupDate.split('T')[0]);
+    if (selectedQuotation.dropoffDate) setValue('endDate',   selectedQuotation.dropoffDate.split('T')[0]);
+    const subtotal = selectedQuotation.items.reduce((s, i) => s + Number(i.total), 0);
+    if (subtotal > 0) setValue('amount', subtotal);
+    const first = selectedQuotation.items[0];
+    if (first) {
+      setValue('customerVehicleMake',         first.description ?? '');
+      setValue('customerVehicleColour',       first.colour ?? '');
+      setValue('customerVehicleRegistration', first.registration ?? '');
+    }
+  }, [selectedQuotationId]);
 
   const createMut = useMutation({
     mutationFn: (d: FormData) => api.post('/trips', {
       ...d,
       trailerId: d.trailerId || null,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); setModalOpen(false); reset(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); setModalOpen(false); reset(); setSelectedQuotationId(null); },
   });
 
   const deleteMut = useMutation({
@@ -167,14 +275,14 @@ export default function TripsPage() {
 
   const fmt = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-brand-600" size={32} /></div>;
+  if (isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (isError) return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20} /><span>Failed to load trips.</span></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Trips</h1>
-        <button onClick={() => { reset(); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        <button onClick={() => { reset(); setSelectedQuotationId(null); setFromCoords(null); setToCoords(null); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           <Plus size={16} /> New Trip
         </button>
       </div>
@@ -250,14 +358,53 @@ export default function TripsPage() {
       <Modal title="New Trip" open={modalOpen} onClose={() => setModalOpen(false)} width="max-w-2xl">
         <form onSubmit={handleSubmit(d => createMut.mutate(d))} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer *</label>
               <select {...register('customerId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option value="">Select customer</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.companyName ? ` — ${c.companyName}` : ''}</option>)}
               </select>
               {errors.customerId && <p className="text-red-500 text-xs mt-1">{errors.customerId.message}</p>}
+              {selectedCustomer && (
+                <div className="mt-2 grid grid-cols-3 gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 text-xs text-gray-600">
+                  {selectedCustomer.companyName && <span><span className="font-medium text-gray-500">Company:</span> {selectedCustomer.companyName}</span>}
+                  {selectedCustomer.contactPerson && <span><span className="font-medium text-gray-500">Contact:</span> {selectedCustomer.contactPerson}</span>}
+                  {selectedCustomer.email && <span><span className="font-medium text-gray-500">Email:</span> {selectedCustomer.email}</span>}
+                  {selectedCustomer.phone && <span><span className="font-medium text-gray-500">Phone:</span> {selectedCustomer.phone}</span>}
+                  {selectedCustomer.address && <span className="col-span-2"><span className="font-medium text-gray-500">Address:</span> {selectedCustomer.address}</span>}
+                </div>
+              )}
             </div>
+            {/* Quotation selector */}
+            {Number(watchedCustomerId) > 0 && (quotationsFetching || customerQuotations.length > 0) && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pre-fill from Quotation</label>
+                {quotationsFetching ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                    <Loader2 size={13} className="animate-spin" /> Loading quotations…
+                  </div>
+                ) : (
+                  <select
+                    value={selectedQuotationId ?? ''}
+                    onChange={e => setSelectedQuotationId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                  >
+                    <option value="">— Fresh trip (no quotation) —</option>
+                    {customerQuotations.map(q => (
+                      <option key={q.id} value={q.id}>
+                        {q.number ?? `Q-${q.id}`} · {q.pickup} → {q.dropoff} [{q.status}]
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedQuotation && (
+                  <p className="text-xs text-brand-600 mt-1">
+                    Fields pre-filled from <strong>{selectedQuotation.number}</strong>. You can override any value below.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle *</label>
               <select {...register('vehicleId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -283,14 +430,31 @@ export default function TripsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">From Location *</label>
-              <input {...register('fromLocation')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. Johannesburg" />
+              <PlacesAutocompleteInput
+                value={fromLocationValue}
+                onChange={val => { setValue('fromLocation', val, { shouldValidate: true }); setFromCoords(null); }}
+                onPlaceSelect={(name, lat, lng) => { setValue('fromLocation', name, { shouldValidate: true }); setFromCoords({ lat, lng }); }}
+                placeholder="e.g. Johannesburg"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
               {errors.fromLocation && <p className="text-red-500 text-xs mt-1">{errors.fromLocation.message}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">To Location *</label>
-              <input {...register('toLocation')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. Cape Town" />
+              <PlacesAutocompleteInput
+                value={toLocationValue}
+                onChange={val => { setValue('toLocation', val, { shouldValidate: true }); setToCoords(null); }}
+                onPlaceSelect={(name, lat, lng) => { setValue('toLocation', name, { shouldValidate: true }); setToCoords({ lat, lng }); }}
+                placeholder="e.g. Cape Town"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
               {errors.toLocation && <p className="text-red-500 text-xs mt-1">{errors.toLocation.message}</p>}
             </div>
+            {estimatedDistance !== null && (
+              <div className="col-span-2 flex items-center gap-1.5 text-xs text-brand-600 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
+                <Navigation size={12} /> Estimated distance: <strong>~{estimatedDistance} km</strong>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
               <input type="date" {...register('startDate')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />

@@ -39,6 +39,7 @@ export default function VehiclesPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { data: vehicles = [], isLoading, isError } = useQuery<Vehicle[]>({
     queryKey: ['vehicles'],
@@ -54,20 +55,18 @@ export default function VehiclesPage() {
     resolver: zodResolver(schema),
   });
 
+  const onMutError = (e: any) => setFormError(e?.response?.data?.error ?? 'An unexpected error occurred.');
+
   const createMut = useMutation({
     mutationFn: (d: any) => api.post('/vehicles', d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vehicles'] });
-      closeModal();
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vehicles'] }); closeModal(); },
+    onError: onMutError,
   });
 
   const updateMut = useMutation({
     mutationFn: (d: any) => api.put(`/vehicles/${editing!.id}`, d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vehicles'] });
-      closeModal();
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vehicles'] }); closeModal(); },
+    onError: onMutError,
   });
 
   const deleteMut = useMutation({
@@ -77,12 +76,14 @@ export default function VehiclesPage() {
 
   const openAdd = () => {
     setEditing(null);
+    setFormError(null);
     reset({ name: '', registrationNo: '', chassisNo: '', engineNo: '', isActive: true, groupId: null });
     setModalOpen(true);
   };
 
   const openEdit = (v: Vehicle) => {
     setEditing(v);
+    setFormError(null);
     reset({
       name: v.name,
       registrationNo: v.registrationNo,
@@ -95,7 +96,7 @@ export default function VehiclesPage() {
     setModalOpen(true);
   };
 
-  const closeModal = () => { setModalOpen(false); setEditing(null); };
+  const closeModal = () => { setModalOpen(false); setEditing(null); setFormError(null); };
 
   const onSubmit = (data: FormData) => {
     const payload: any = { ...data };
@@ -124,8 +125,9 @@ export default function VehiclesPage() {
   };
 
   if (isLoading) return (
-    <div className="flex items-center justify-center h-64">
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
       <Loader2 className="animate-spin text-brand-600" size={32} />
+      <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
     </div>
   );
 
@@ -239,6 +241,11 @@ export default function VehiclesPage() {
             </div>
           </div>
 
+          {formError && (
+            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertCircle size={15} className="shrink-0" />{formError}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancel

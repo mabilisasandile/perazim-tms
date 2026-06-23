@@ -657,7 +657,7 @@ export default function CollectionPage() {
 
       {/* Collection list */}
       {isLoading ? (
-        <div className="flex justify-center h-40 items-center"><Loader2 className="animate-spin text-brand-600" size={28} /></div>
+        <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">

@@ -138,8 +138,9 @@ export default function SearchPage() {
       )}
 
       {isLoading && (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="animate-spin text-brand-600" size={32} />
+          <p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p>
         </div>
       )}
 
