@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import type { Libraries } from '@react-google-maps/api';
 
-const LIBRARIES: Libraries = ['places', 'drawing'];
+const LIBRARIES: Libraries = ['places'];
 
 interface Ctx { isLoaded: boolean; }
 const MapsCtx = createContext<Ctx>({ isLoaded: false });

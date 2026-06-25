@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import { Resend } from 'resend';
 import { prisma } from '../../lib/prisma';
 import { settingsService } from '../settings/settings.service';
 
@@ -169,15 +168,6 @@ async function sendViaEmail(to: string, subject: string, html: string): Promise<
   await transporter.sendMail({ from: smtp.fromEmail, to, subject, html });
 }
 
-async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not configured');
-  const resend = new Resend(apiKey);
-  const from = process.env.RESEND_FROM_EMAIL ?? 'Perazim TMS <noreply@perazim.com>';
-  const { error } = await resend.emails.send({ from, to, subject, html });
-  if (error) throw new Error((error as any).message ?? JSON.stringify(error));
-}
-
 async function sendViaSms(to: string, body: string): Promise<void> {
   const config = await prisma.twilioConfig.findFirst();
   if (!config || !config.enabled) throw new Error('Twilio SMS not configured or disabled');
@@ -261,14 +251,9 @@ export const notificationService = {
 
       try {
         if (channel === 'EMAIL' && email) {
-          const provider = process.env.RESEND_API_KEY ? 'Resend' : 'SMTP';
-          console.log(`[NOTIF] ${type} | EMAIL (${provider}) → ${email}`);
-          if (process.env.RESEND_API_KEY) {
-            await sendViaResend(email, msg.subject, msg.html);
-          } else {
-            await sendViaEmail(email, msg.subject, msg.html);
-          }
-          console.log(`[NOTIF] ✓ EMAIL sent (${provider}): ${type} → ${email}`);
+          console.log(`[NOTIF] ${type} | EMAIL (SendGrid) → ${email}`);
+          await sendViaEmail(email, msg.subject, msg.html);
+          console.log(`[NOTIF] ✓ EMAIL sent (SendGrid): ${type} → ${email}`);
         } else if (channel === 'SMS' && phone) {
           console.log(`[NOTIF] ${type} | SMS → ${phone}`);
           await sendViaSms(phone, msg.text);
@@ -371,15 +356,10 @@ export const notificationService = {
         </p>
       </div>`;
 
-    const provider = process.env.RESEND_API_KEY ? 'Resend' : 'SMTP';
-    console.log(`[NOTIF] Welcome email (${type}) via ${provider} → ${to}`);
+    console.log(`[NOTIF] Welcome email (${type}) via SendGrid → ${to}`);
     try {
-      if (process.env.RESEND_API_KEY) {
-        await sendViaResend(to, cfg.subject, html);
-      } else {
-        await sendViaEmail(to, cfg.subject, html);
-      }
-      console.log(`[NOTIF] ✓ Welcome email sent (${provider}): ${type} → ${to}`);
+      await sendViaEmail(to, cfg.subject, html);
+      console.log(`[NOTIF] ✓ Welcome email sent (SendGrid): ${type} → ${to}`);
     } catch (err: any) {
       console.error(`[NOTIF] ✗ Welcome email failed (${provider}): ${type} → ${to} | ${err.message ?? err}`);
     }

@@ -1,5 +1,5 @@
-import { useCallback, useRef } from 'react';
-import { GoogleMap, DrawingManager, Polygon } from '@react-google-maps/api';
+import { useCallback, useRef, useState } from 'react';
+import { GoogleMap, Polygon } from '@react-google-maps/api';
 import { useGoogleMaps } from './GoogleMapsProvider';
 import { Loader2 } from 'lucide-react';
 
@@ -32,6 +32,8 @@ export default function GeofenceDrawer({
 }: Props) {
   const { isLoaded } = useGoogleMaps();
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [draftPoints, setDraftPoints] = useState<LatLng[]>([]);
 
   const onLoad = useCallback(
     (map: google.maps.Map) => {
@@ -50,19 +52,31 @@ export default function GeofenceDrawer({
     [],
   );
 
-  const onPolygonComplete = useCallback(
-    (polygon: google.maps.Polygon) => {
-      const path = polygon.getPath();
-      const coords: LatLng[] = [];
-      for (let i = 0; i < path.getLength(); i++) {
-        const pt = path.getAt(i);
-        coords.push({ lat: pt.lat(), lng: pt.lng() });
-      }
-      onAreaDrawn?.(coords);
-      polygon.setMap(null);
+  const handleMapClick = useCallback(
+    (e: google.maps.MapMouseEvent) => {
+      if (!isDrawing || !e.latLng) return;
+      setDraftPoints(prev => [...prev, { lat: e.latLng!.lat(), lng: e.latLng!.lng() }]);
     },
-    [onAreaDrawn],
+    [isDrawing],
   );
+
+  const startDrawing = useCallback(() => {
+    setDraftPoints([]);
+    setIsDrawing(true);
+  }, []);
+
+  const cancelDrawing = useCallback(() => {
+    setDraftPoints([]);
+    setIsDrawing(false);
+  }, []);
+
+  const finishDrawing = useCallback(() => {
+    if (draftPoints.length >= 3) {
+      onAreaDrawn?.(draftPoints);
+    }
+    setDraftPoints([]);
+    setIsDrawing(false);
+  }, [draftPoints, onAreaDrawn]);
 
   if (!isLoaded) {
     return (
@@ -73,30 +87,24 @@ export default function GeofenceDrawer({
   }
 
   return (
-    <div style={{ height }} className="rounded-xl overflow-hidden">
+    <div style={{ height }} className="rounded-xl overflow-hidden relative">
       <GoogleMap
         mapContainerStyle={CONTAINER_STYLE}
         center={CENTER_SA}
         zoom={6}
         onLoad={onLoad}
+        onClick={handleMapClick}
+        options={{ disableDoubleClickZoom: isDrawing, cursor: isDrawing ? 'crosshair' : undefined }}
       >
-        {!readOnly && onAreaDrawn && (
-          <DrawingManager
-            drawingMode={google.maps.drawing.OverlayType.POLYGON}
-            onPolygonComplete={onPolygonComplete}
+        {isDrawing && draftPoints.length >= 2 && (
+          <Polygon
+            paths={draftPoints}
             options={{
-              drawingControl: true,
-              drawingControlOptions: {
-                position: google.maps.ControlPosition.TOP_CENTER,
-                drawingModes: [google.maps.drawing.OverlayType.POLYGON],
-              },
-              polygonOptions: {
-                fillColor: '#3b82f6',
-                fillOpacity: 0.25,
-                strokeColor: '#1d4ed8',
-                strokeWeight: 2,
-                editable: true,
-              },
+              fillColor: '#3b82f6',
+              fillOpacity: 0.2,
+              strokeColor: '#1d4ed8',
+              strokeWeight: 2,
+              editable: false,
             }}
           />
         )}
@@ -118,6 +126,43 @@ export default function GeofenceDrawer({
           );
         })}
       </GoogleMap>
+
+      {!readOnly && onAreaDrawn && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white rounded-lg shadow-md px-3 py-2 text-sm">
+          {!isDrawing ? (
+            <button
+              onClick={startDrawing}
+              className="font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1.5"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+              </svg>
+              Draw Geofence
+            </button>
+          ) : (
+            <>
+              <span className="text-gray-500 text-xs">
+                {draftPoints.length === 0
+                  ? 'Click on the map to place points'
+                  : `${draftPoints.length} point${draftPoints.length !== 1 ? 's' : ''} — keep clicking to add more`}
+              </span>
+              <button
+                onClick={finishDrawing}
+                disabled={draftPoints.length < 3}
+                className="text-xs font-medium bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Finish
+              </button>
+              <button
+                onClick={cancelDrawing}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1 rounded"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
