@@ -14,6 +14,10 @@ interface Payment {
   reference:string|null; paidAt:string|null; createdAt:string;
   trip:{ id:number; trackingCode:string; fromLocation:string; toLocation:string; customer:{name:string}; };
 }
+interface TripOption {
+  id:number; trackingCode:string; fromLocation:string; toLocation:string;
+  vehicleId:number; amount:number|null; customer:{name:string}|null;
+}
 interface Summary { total:{count:number;amount:number}; paid:{count:number;amount:number}; pending:{count:number;amount:number}; failed:{count:number;amount:number}; }
 
 const schema = z.object({
@@ -37,19 +41,32 @@ export default function PaymentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [viewing, setViewing] = useState<Payment|null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [formError, setFormError] = useState<string|null>(null);
 
   const { data:payments=[], isLoading, isError } = useQuery<Payment[]>({
     queryKey:['payments',statusFilter],
     queryFn:()=>api.get('/payments',{params:statusFilter?{status:statusFilter}:{}}).then(r=>Array.isArray(r.data)?r.data:r.data?.data??[]),
   });
   const { data:summary } = useQuery<Summary>({ queryKey:['payments-summary'], queryFn:()=>api.get('/payments/summary').then(r=>r.data) });
-  const { data:trips=[] } = useQuery<{id:number;trackingCode:string;fromLocation:string;toLocation:string;vehicleId:number}[]>({
+  const { data:allPayments=[] } = useQuery<Payment[]>({
+    queryKey:['payments','all'],
+    queryFn:()=>api.get('/payments').then(r=>Array.isArray(r.data)?r.data:r.data?.data??[]),
+  });
+  const { data:trips=[] } = useQuery<TripOption[]>({
     queryKey:['trips-select'], queryFn:()=>api.get('/trips').then(r=>(Array.isArray(r.data)?r.data:r.data?.data??[]).filter((t:any)=>t.status!=='CANCELLED')),
   });
+  const tripIdsWithPayment = new Set(allPayments.map(p => p.tripId));
+  const availableTrips = trips.filter(t => !tripIdsWithPayment.has(t.id));
 
-  const { register, handleSubmit, reset, formState:{errors,isSubmitting} } = useForm<FormData>({ resolver:zodResolver(schema) });
+  const { register, handleSubmit, reset, setValue, watch, formState:{errors,isSubmitting} } = useForm<FormData>({ resolver:zodResolver(schema) });
+  const watchedTripId = watch('tripId');
+  const selectedTrip = trips.find(t => t.id === Number(watchedTripId));
 
-  const createMut = useMutation({ mutationFn:(d:FormData)=>api.post('/payments',d), onSuccess:()=>{ qc.invalidateQueries({queryKey:['payments']}); qc.invalidateQueries({queryKey:['payments-summary']}); setModalOpen(false); reset(); }});
+  const createMut = useMutation({
+    mutationFn:(d:FormData)=>api.post('/payments',d),
+    onSuccess:()=>{ qc.invalidateQueries({queryKey:['payments']}); qc.invalidateQueries({queryKey:['payments-summary']}); setModalOpen(false); setFormError(null); reset(); },
+    onError:(err:any)=>{ setFormError(err?.response?.data?.message ?? 'Failed to record payment. Please try again.'); },
+  });
   const markPaidMut = useMutation({ mutationFn:({id,ref}:{id:number;ref?:string})=>api.patch(`/payments/${id}/mark-paid`,{reference:ref}), onSuccess:()=>{ qc.invalidateQueries({queryKey:['payments']}); qc.invalidateQueries({queryKey:['payments-summary']}); }});
 
   if(isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32}/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
@@ -122,14 +139,39 @@ export default function PaymentsPage() {
         </table>
       </div>
 
-      <Modal title="Record Payment" open={modalOpen} onClose={()=>setModalOpen(false)}>
+      <Modal title="Record Payment" open={modalOpen} onClose={()=>{ setModalOpen(false); setFormError(null); }}>
         <form onSubmit={handleSubmit(d=>createMut.mutate(d))} className="space-y-4">
+          {formError && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <AlertCircle size={16} className="mt-0.5 shrink-0"/>{formError}
+            </div>
+          )}
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Trip *</label>
-            <select {...register('tripId')} onChange={e=>{ const t=trips.find(t=>t.id===+e.target.value); if(t) reset(prev=>({...prev,tripId:t.id,vehicleId:t.vehicleId})); }} className={`${inp} bg-white`}>
+            <select
+              {...register('tripId', {
+                onChange: e => {
+                  const t = trips.find(t => t.id === +e.target.value);
+                  if (t) {
+                    setValue('vehicleId', t.vehicleId, { shouldValidate: true });
+                    if (t.amount != null) setValue('amount', Number(t.amount), { shouldValidate: true });
+                  }
+                },
+              })}
+              className={`${inp} bg-white`}
+            >
               <option value="">Select trip</option>
-              {trips.map(t=><option key={t.id} value={t.id}>{t.trackingCode.slice(0,8)} — {t.fromLocation} → {t.toLocation}</option>)}
+              {availableTrips.map(t=><option key={t.id} value={t.id}>{t.trackingCode.slice(0,8)} — {t.fromLocation} → {t.toLocation}</option>)}
             </select>
-            {errors.tripId&&<p className="text-red-500 text-xs mt-1">{errors.tripId.message}</p>}</div>
+            {errors.tripId&&<p className="text-red-500 text-xs mt-1">{errors.tripId.message}</p>}
+          </div>
+          {selectedTrip && (
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 grid grid-cols-2 gap-2">
+              <div><span className="text-blue-500">Customer</span><p className="font-medium">{selectedTrip.customer?.name ?? '—'}</p></div>
+              <div><span className="text-blue-500">Route</span><p className="font-medium">{selectedTrip.fromLocation} → {selectedTrip.toLocation}</p></div>
+              <div><span className="text-blue-500">Tracking</span><p className="font-mono">{selectedTrip.trackingCode}</p></div>
+              {selectedTrip.amount != null && <div><span className="text-blue-500">Trip Amount</span><p className="font-medium">{fmt(Number(selectedTrip.amount))}</p></div>}
+            </div>
+          )}
           <input type="hidden" {...register('vehicleId')}/>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount (ZAR) *</label>

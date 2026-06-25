@@ -78,7 +78,11 @@ interface Invoice {
   payments?: InvoicePayment[];
 }
 
-interface CustomerOption { id: number; name: string; payLaterApproved?: boolean; }
+interface CustomerOption {
+  id: number; name: string; payLaterApproved?: boolean;
+  email?: string; phone?: string | null; address?: string | null;
+  vatNumber?: string | null; contactPerson?: string | null;
+}
 
 /* ── schemas ─────────────────────────────────────────── */
 
@@ -158,9 +162,14 @@ export default function InvoicesPage() {
     queryFn: () =>
       api.get('/customers')
          .then(r => normalizeList(r.data).map((c: any) => ({
-           id: c.id,
-           name: c.name,
+           id:              c.id,
+           name:            c.name,
            payLaterApproved: c.payLaterApproved ?? false,
+           email:           c.email,
+           phone:           c.phone ?? null,
+           address:         c.address ?? null,
+           vatNumber:       c.vatNumber ?? null,
+           contactPerson:   c.contactPerson ?? null,
          }))),
   });
 
@@ -667,6 +676,9 @@ function InvoiceForm({
     });
   }
 
+  const selectedCustomerId = Number(watch('customerId'));
+  const selectedCustomer = customers.find((c: CustomerOption) => c.id === selectedCustomerId) ?? null;
+
   return (
     <form onSubmit={handleSubmit((d: any) => createMut.mutate(d))} className="space-y-4">
       <div>
@@ -681,6 +693,16 @@ function InvoiceForm({
         </select>
         {errors.customerId && <p className="text-red-500 text-xs mt-1">{errors.customerId.message}</p>}
       </div>
+      {selectedCustomer && (
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 grid grid-cols-2 gap-2">
+          {selectedCustomer.contactPerson && <div><span className="text-blue-500">Contact</span><p className="font-medium">{selectedCustomer.contactPerson}</p></div>}
+          {selectedCustomer.email        && <div><span className="text-blue-500">Email</span><p className="font-medium">{selectedCustomer.email}</p></div>}
+          {selectedCustomer.phone        && <div><span className="text-blue-500">Phone</span><p className="font-medium">{selectedCustomer.phone}</p></div>}
+          {selectedCustomer.vatNumber    && <div><span className="text-blue-500">VAT No.</span><p className="font-medium">{selectedCustomer.vatNumber}</p></div>}
+          {selectedCustomer.address      && <div className="col-span-2"><span className="text-blue-500">Address</span><p className="font-medium">{selectedCustomer.address}</p></div>}
+          {selectedCustomer.payLaterApproved && <div className="col-span-2"><span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Pay-Later Approved</span></div>}
+        </div>
+      )}
 
       {/* Items (bulk mode always shows, single mode optional) */}
       <div>
