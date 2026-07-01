@@ -18,6 +18,7 @@ import NotFoundPage    from './pages/NotFoundPage';
 
 import DashboardPage      from './pages/dashboard/DashboardPage';
 import VehiclesPage       from './pages/vehicles/VehiclesPage';
+import VehicleDetailPage  from './pages/vehicles/VehicleDetailPage';
 import TrailersPage       from './pages/trailers/TrailersPage';
 import DriversPage        from './pages/drivers/DriversPage';
 import TripsPage          from './pages/trips/TripsPage';
@@ -108,7 +109,8 @@ export default function App() {
         <Route path="/app" element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
           <Route index element={<Navigate to="/app/dashboard" replace />} />
           <Route path="dashboard"        element={<DashboardPage />} />
-          <Route path="vehicles/*"       element={<VehiclesPage />} />
+          <Route path="vehicles"           element={<VehiclesPage />} />
+          <Route path="vehicles/:id"     element={<VehicleDetailPage />} />
           <Route path="trailers/*"       element={<TrailersPage />} />
           <Route path="drivers/*"        element={<DriversPage />} />
           <Route path="trips/*"          element={<TripsPage />} />

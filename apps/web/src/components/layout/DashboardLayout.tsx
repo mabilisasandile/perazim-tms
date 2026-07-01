@@ -12,11 +12,11 @@ import logo from '../../assets/uploads/pera.png';
 
 const navItems = [
   { to: '/app/dashboard',        icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/app/trips',            icon: Route,           label: 'Trips' },
-  { to: '/app/vehicles',         icon: Truck,           label: 'Vehicles' },
-  { to: '/app/trailers',         icon: Container,       label: 'Trailers' },
+  { to: '/app/vehicles',         icon: Truck,           label: 'Perazim Trucks' },
+  { to: '/app/trailers',         icon: Container,       label: 'Perazim Trailers' },
   { to: '/app/drivers',          icon: Users,           label: 'Drivers' },
   { to: '/app/customers',        icon: UserCircle,      label: 'Customers' },
+  { to: '/app/trips',            icon: Route,           label: 'Trips' },
   { to: '/app/quotations',       icon: FileText,        label: 'Quotations' },
   { to: '/app/invoices',         icon: Receipt,         label: 'Invoices' },
   { to: '/app/payments',         icon: CreditCard,      label: 'Payments' },
