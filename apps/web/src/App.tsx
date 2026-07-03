@@ -33,7 +33,6 @@ import WarehousesPage     from './pages/warehouses/WarehousesPage';
 import GateScansPage      from './pages/gate-scans/GateScansPage';
 import PODPage            from './pages/pod/PODPage';
 import CollectionPage     from './pages/collection/CollectionPage';
-import LoadsheetsPage     from './pages/loadsheets/LoadsheetsPage';
 import PaymentsPage       from './pages/payments/PaymentsPage';
 import UsersPage          from './pages/users/UsersPage';
 import SettingsPage       from './pages/settings/SettingsPage';
@@ -125,7 +124,6 @@ export default function App() {
           <Route path="gate-scans/*"     element={<GateScansPage />} />
           <Route path="pod/*"            element={<PODPage />} />
           <Route path="collections/*"    element={<CollectionPage />} />
-          <Route path="loadsheets/*"     element={<LoadsheetsPage />} />
           <Route path="payments/*"       element={<PaymentsPage />} />
           <Route path="users/*"          element={<UsersPage />} />
           <Route path="settings/*"       element={<SettingsPage />} />

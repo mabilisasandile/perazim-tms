@@ -37,6 +37,9 @@ export default function RemindersPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   const { data: reminders = [], isLoading, isError } = useQuery<Reminder[]>({
     queryKey: ['reminders', unreadOnly],
@@ -70,6 +73,21 @@ export default function RemindersPage() {
   const unreadCount = reminders.filter(r => !r.isRead).length;
   const inp = 'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
+  const filtered = reminders.filter(r => {
+    const q = search.toLowerCase();
+    return (
+      (r.title ?? '').toLowerCase().includes(q) ||
+      (r.description ?? '').toLowerCase().includes(q) ||
+      (r.vehicle?.name ?? '').toLowerCase().includes(q)
+    );
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+  const pageRows = filtered.slice(start, start + pageSize);
+  const showingFrom = filtered.length === 0 ? 0 : start + 1;
+  const showingTo = Math.min(start + pageSize, filtered.length);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -88,31 +106,58 @@ export default function RemindersPage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {reminders.length === 0
-          ? <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No reminders found.</div>
-          : reminders.map(r => {
-            const badge = dueBadge(r.dueDate);
-            return (
-              <div key={r.id} className={`bg-white rounded-xl border p-4 flex items-start gap-4 ${r.isRead ? 'opacity-60' : ''}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className={`font-semibold text-gray-900 ${r.isRead ? 'line-through text-gray-400' : ''}`}>{r.title}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Show</span>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span>entries</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Search:</span>
+            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div className="divide-y divide-gray-100">
+          {pageRows.length === 0
+            ? <div className="p-10 text-center text-gray-400">No reminders found.</div>
+            : pageRows.map(r => {
+              const badge = dueBadge(r.dueDate);
+              return (
+                <div key={r.id} className={`p-4 flex items-start gap-4 ${r.isRead ? 'opacity-60' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className={`font-semibold text-gray-900 ${r.isRead ? 'line-through text-gray-400' : ''}`}>{r.title}</p>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                    </div>
+                    {r.description && <p className="text-sm text-gray-500 mb-1">{r.description}</p>}
+                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                      <span>Due: {format(new Date(r.dueDate), 'dd MMM yyyy')}</span>
+                      {r.vehicle && <span>Vehicle: {r.vehicle.name} ({r.vehicle.registrationNo})</span>}
+                    </div>
                   </div>
-                  {r.description && <p className="text-sm text-gray-500 mb-1">{r.description}</p>}
-                  <div className="flex items-center gap-4 text-xs text-gray-400">
-                    <span>Due: {format(new Date(r.dueDate), 'dd MMM yyyy')}</span>
-                    {r.vehicle && <span>Vehicle: {r.vehicle.name} ({r.vehicle.registrationNo})</span>}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!r.isRead && <button onClick={() => markReadMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-green-600" title="Mark read"><Check size={16}/></button>}
+                    <button onClick={() => confirm(`Delete "${r.title}"?`) && deleteMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {!r.isRead && <button onClick={() => markReadMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-green-600" title="Mark read"><Check size={16}/></button>}
-                  <button onClick={() => confirm(`Delete "${r.title}"?`) && deleteMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+        </div>
+
+        <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+          <span>{filtered.length === 0 ? 'No entries' : `Showing ${showingFrom} to ${showingTo} of ${filtered.length} entries`}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button key={n} onClick={() => setPage(n)} className={`px-3 py-1 border rounded text-sm ${safePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+            ))}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+          </div>
+        </div>
       </div>
 
       <Modal title="Add Reminder" open={modalOpen} onClose={() => setModalOpen(false)}>

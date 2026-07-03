@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Truck, Users, Route, UserCircle,
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
-  ClipboardList, Package, Search, History, Building2, ScanLine, BadgeCheck, UserCheck, Wallet, BellRing, BarChart2,
+  ClipboardList, Search, History, Building2, ScanLine, BadgeCheck, UserCheck, Wallet, BellRing, BarChart2,
   Map, MapPin,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
@@ -15,8 +15,8 @@ const navItems = [
   { to: '/app/vehicles',         icon: Truck,           label: 'Perazim Trucks' },
   { to: '/app/trailers',         icon: Container,       label: 'Perazim Trailers' },
   { to: '/app/drivers',          icon: Users,           label: 'Drivers' },
-  { to: '/app/customers',        icon: UserCircle,      label: 'Customers' },
   { to: '/app/trips',            icon: Route,           label: 'Trips' },
+  { to: '/app/customers',        icon: UserCircle,      label: 'Customers' },
   { to: '/app/quotations',       icon: FileText,        label: 'Quotations' },
   { to: '/app/invoices',         icon: Receipt,         label: 'Invoices' },
   { to: '/app/payments',         icon: CreditCard,      label: 'Payments' },
@@ -28,7 +28,6 @@ const navItems = [
   { to: '/app/gate-scans',      icon: ScanLine,        label: 'Gate Scanning' },
   { to: '/app/pod',             icon: BadgeCheck,      label: 'Proof of Delivery' },
   { to: '/app/collections',     icon: UserCheck,       label: 'Customer Collection' },
-  { to: '/app/loadsheets',       icon: Package,         label: 'Load Sheets' },
   { to: '/app/reminders',        icon: Bell,            label: 'Reminders' },
   { to: '/app/users',            icon: ShieldCheck,     label: 'Users' },
   { to: '/app/fuel-tanker',        icon: Fuel,             label: 'Fuel Tanker Division' },

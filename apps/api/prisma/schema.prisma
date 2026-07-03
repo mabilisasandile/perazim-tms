@@ -700,6 +700,10 @@ model TruckLoadSheet {
   route        String
   capacity     Int
   status       TruckLoadSheetStatus   @default(OPEN)
+  startDate       DateTime?
+  endDate         DateTime?
+  pickupLocation  String?
+  dropOffLocation String?
   notes        String?                @db.Text
   dispatchedAt DateTime?
   completedAt  DateTime?

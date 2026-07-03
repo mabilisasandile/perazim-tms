@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye, FolderOpen, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye, FolderOpen, AlertTriangle, List, Clock, Route, Package } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import DriverDocsModal from './DriverDocsModal';
+import TimesheetsTab from './TimesheetsTab';
+import TripSheetsTab from './TripSheetsTab';
+import LoadSheetsTab from './LoadSheetsTab';
 
 /* ── helpers ─────────────────────────────────────────── */
 
@@ -93,8 +96,11 @@ interface TrailerOption { id: number; registrationNo: string; }
 
 /* ── component ──────────────────────────────────────── */
 
+type Tab = 'list' | 'timesheets' | 'tripsheets' | 'loadsheets';
+
 export default function DriversPage() {
   const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>('list');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Driver | null>(null);
   const [viewDriver, setViewDriver] = useState<Driver | null>(null);
@@ -172,18 +178,45 @@ export default function DriversPage() {
 
   const closeModal = () => { setModalOpen(false); setEditing(null); };
 
-  if (isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if (isError) return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20} /><span>Failed to load drivers.</span></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Drivers</h1>
-        <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Add Driver
-        </button>
+        {tab === 'list' && (
+          <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Plus size={16} /> Add Driver
+          </button>
+        )}
       </div>
 
+      <div className="flex gap-1 border-b border-gray-200">
+        {([
+          { id: 'list' as Tab,       label: 'Driver List', icon: List },
+          { id: 'timesheets' as Tab, label: 'Timesheets',  icon: Clock },
+          { id: 'tripsheets' as Tab, label: 'Trip Sheets', icon: Route },
+          { id: 'loadsheets' as Tab, label: 'Load Sheets', icon: Package },
+        ]).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            <Icon size={15} />{label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'timesheets' ? (
+        <TimesheetsTab />
+      ) : tab === 'tripsheets' ? (
+        <TripSheetsTab />
+      ) : tab === 'loadsheets' ? (
+        <LoadSheetsTab />
+      ) : isLoading ? (
+        <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
+      ) : (
       <div className="bg-white rounded-xl border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -239,6 +272,7 @@ export default function DriversPage() {
           </table>
         </div>
       </div>
+      )}
 
       <Modal title={editing ? 'Edit Driver' : 'Add Driver'} open={modalOpen} onClose={closeModal} width="max-w-2xl">
         <form onSubmit={handleSubmit(d => editing ? updateMut.mutate(d) : createMut.mutate(d))} className="space-y-5">

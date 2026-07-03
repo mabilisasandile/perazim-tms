@@ -663,6 +663,9 @@ function DeliveriesTab() {
 function LoadsTab() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [loadsSearch, setLoadsSearch]     = useState('');
+  const [loadsPageSize, setLoadsPageSize] = useState(10);
+  const [loadsPage, setLoadsPage]         = useState(1);
 
   const { data: loads = [], isLoading, isError } = useQuery<Load[]>({
     queryKey: ['fuel-tanker-loads'],
@@ -707,6 +710,21 @@ function LoadsTab() {
     return acc;
   }, {});
 
+  const loadsFiltered = loads.filter(l => {
+    const q = loadsSearch.toLowerCase();
+    return (
+      (l.tanker?.name ?? '').toLowerCase().includes(q) ||
+      (l.driverName ?? '').toLowerCase().includes(q) ||
+      (l.depotName ?? '').toLowerCase().includes(q)
+    );
+  });
+  const loadsTotalPages = Math.max(1, Math.ceil(loadsFiltered.length / loadsPageSize));
+  const loadsSafePage = Math.min(loadsPage, loadsTotalPages);
+  const loadsStart = (loadsSafePage - 1) * loadsPageSize;
+  const loadsPageRows = loadsFiltered.slice(loadsStart, loadsStart + loadsPageSize);
+  const loadsShowingFrom = loadsFiltered.length === 0 ? 0 : loadsStart + 1;
+  const loadsShowingTo = Math.min(loadsStart + loadsPageSize, loadsFiltered.length);
+
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -740,6 +758,19 @@ function LoadsTab() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Show</span>
+            <select value={loadsPageSize} onChange={e => { setLoadsPageSize(Number(e.target.value)); setLoadsPage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span>entries</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Search:</span>
+            <input value={loadsSearch} onChange={e => { setLoadsSearch(e.target.value); setLoadsPage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -756,9 +787,9 @@ function LoadsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loads.length === 0 ? (
+              {loadsPageRows.length === 0 ? (
                 <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">No load records yet.</td></tr>
-              ) : loads.map(l => (
+              ) : loadsPageRows.map(l => (
                 <tr key={l.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">{fmtDate(l.loadDate)}</td>
                   <td className="px-4 py-3 font-medium">{l.tanker.name} <span className="text-gray-400 font-normal">({l.tanker.registrationNo})</span></td>
@@ -776,6 +807,16 @@ function LoadsTab() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+          <span>{loadsFiltered.length === 0 ? 'No entries' : `Showing ${loadsShowingFrom} to ${loadsShowingTo} of ${loadsFiltered.length} entries`}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setLoadsPage(p => Math.max(1, p - 1))} disabled={loadsSafePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+            {Array.from({ length: loadsTotalPages }, (_, i) => i + 1).map(n => (
+              <button key={n} onClick={() => setLoadsPage(n)} className={`px-3 py-1 border rounded text-sm ${loadsSafePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+            ))}
+            <button onClick={() => setLoadsPage(p => Math.min(loadsTotalPages, p + 1))} disabled={loadsSafePage === loadsTotalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+          </div>
         </div>
       </div>
 

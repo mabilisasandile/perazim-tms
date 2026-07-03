@@ -223,6 +223,9 @@ export default function InspectionsPage() {
   const [stageFilter, setStageFilter] = useState<Stage | ''>('');
   const [tab, setTab] = useState<'list' | 'checklist'>('list');
   const [viewing, setViewing] = useState<Inspection | null>(null);
+  const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   // New inspection form
   const [formOpen, setFormOpen] = useState(false);
@@ -355,6 +358,22 @@ export default function InspectionsPage() {
   const stepIndex = STEPS.findIndex(s => s.id === step);
   const canNext = step === 'basic' ? (!!tripId && !!driverId) : true;
 
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const filtered = inspections.filter(ins => {
+    const q = search.toLowerCase();
+    return (
+      (ins.trip?.customerVehicleRegistration ?? '').toLowerCase().includes(q) ||
+      (ins.trip?.customer?.name ?? '').toLowerCase().includes(q) ||
+      (ins.driver?.name ?? '').toLowerCase().includes(q)
+    );
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+  const pageRows = filtered.slice(start, start + pageSize);
+  const showingFrom = filtered.length === 0 ? 0 : start + 1;
+  const showingTo = Math.min(start + pageSize, filtered.length);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -411,6 +430,19 @@ export default function InspectionsPage() {
           <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
         ) : (
           <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Show</span>
+                <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span>entries</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Search:</span>
+                <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -428,9 +460,9 @@ export default function InspectionsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {inspections.length === 0 ? (
+                  {pageRows.length === 0 ? (
                     <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">No inspections yet.</td></tr>
-                  ) : inspections.map(ins => {
+                  ) : pageRows.map(ins => {
                     const data     = ins.data || {};
                     const fails    = Object.values(data).filter(v => v === 'fail').length;
                     const stageObj = STAGES.find(s => s.id === ins.stage);
@@ -480,6 +512,16 @@ export default function InspectionsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+              <span>{filtered.length === 0 ? 'No entries' : `Showing ${showingFrom} to ${showingTo} of ${filtered.length} entries`}</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setPage(n)} className={`px-3 py-1 border rounded text-sm ${safePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+              </div>
             </div>
           </div>
         )

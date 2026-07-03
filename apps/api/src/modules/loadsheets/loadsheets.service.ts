@@ -119,7 +119,7 @@ export const loadsheetsService = {
           truck:    { select: TRUCK_SELECT },
           trailer:  { select: TRAILER_SELECT },
           driver:   { select: DRIVER_SELECT },
-          vehicles: { select: { id: true, status: true } },
+          vehicles: { select: { id: true, tripId: true, status: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip:    (page - 1) * limit,
@@ -140,26 +140,60 @@ export const loadsheetsService = {
 
   async create(input: CreateLoadSheetInput) {
     const loadSheetNo = await generateLoadSheetNo();
+    const items = input.items ?? [];
 
-    const ls = await prisma.truckLoadSheet.create({
+    const joinedRoute = [input.pickupLocation, input.dropOffLocation].filter(Boolean).join(' → ');
+    const route = input.route ?? (joinedRoute || 'N/A');
+    const capacity = input.capacity ?? Math.max(items.length, 1);
+
+    if (items.length > capacity) {
+      throw new AppError(`Capacity (${capacity}) is smaller than the number of items (${items.length}).`, 400);
+    }
+
+    const tripIds = items.map(i => i.tripId);
+    if (tripIds.length) {
+      const alreadyAssigned = await prisma.truckLoadSheetVehicle.findMany({
+        where: { tripId: { in: tripIds } },
+        select: { tripId: true },
+      });
+      if (alreadyAssigned.length) {
+        throw new AppError(`Trip(s) already assigned to a load sheet: ${alreadyAssigned.map(a => a.tripId).join(', ')}`, 409);
+      }
+      const trips = await prisma.trip.findMany({ where: { id: { in: tripIds } }, select: { id: true } });
+      if (trips.length !== tripIds.length) throw new AppError('One or more selected trips were not found', 404);
+    }
+
+    const created = await prisma.truckLoadSheet.create({
       data: {
         loadSheetNo,
-        truckId:   input.truckId,
-        trailerId: input.trailerId ?? null,
-        driverId:  input.driverId,
-        route:     input.route,
-        capacity:  input.capacity,
-        notes:     input.notes ?? null,
+        truckId:         input.truckId,
+        trailerId:       input.trailerId ?? null,
+        driverId:        input.driverId,
+        startDate:       input.startDate ?? null,
+        endDate:         input.endDate ?? null,
+        pickupLocation:  input.pickupLocation ?? null,
+        dropOffLocation: input.dropOffLocation ?? null,
+        route,
+        capacity,
+        notes: input.notes ?? null,
+        vehicles: items.length ? {
+          create: items.map(item => ({
+            tripId:           item.tripId,
+            pickupLocation:   item.pickupLocation   || input.pickupLocation  || '',
+            deliveryLocation: item.deliveryLocation || input.dropOffLocation || '',
+            vehicleCondition: item.vehicleCondition ?? null,
+          })),
+        } : undefined,
       },
       include: FULL_INCLUDE,
     });
 
     // Notify driver
     notificationService.dispatch('DISPATCH_ASSIGNMENT', {
-      trip:   { trackingCode: ls.loadSheetNo, driver: ls.driver },
+      trip: { trackingCode: created.loadSheetNo, driver: created.driver },
     }).catch(() => {});
 
-    return ls;
+    return created;
   },
 
   // ── update header ────────────────────────────────────────────────────────────
@@ -173,10 +207,14 @@ export const loadsheetsService = {
     return prisma.truckLoadSheet.update({
       where: { id },
       data: {
-        ...(input.trailerId !== undefined ? { trailerId: input.trailerId } : {}),
-        ...(input.route    ? { route: input.route }       : {}),
-        ...(input.capacity ? { capacity: input.capacity } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.trailerId       !== undefined ? { trailerId: input.trailerId }             : {}),
+        ...(input.route                         ? { route: input.route }                     : {}),
+        ...(input.capacity                      ? { capacity: input.capacity }                : {}),
+        ...(input.notes           !== undefined ? { notes: input.notes }                     : {}),
+        ...(input.startDate       !== undefined ? { startDate: input.startDate }             : {}),
+        ...(input.endDate         !== undefined ? { endDate: input.endDate }                 : {}),
+        ...(input.pickupLocation  !== undefined ? { pickupLocation: input.pickupLocation }   : {}),
+        ...(input.dropOffLocation !== undefined ? { dropOffLocation: input.dropOffLocation } : {}),
       },
       include: FULL_INCLUDE,
     });

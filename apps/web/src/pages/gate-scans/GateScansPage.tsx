@@ -114,6 +114,16 @@ export default function GateScansPage() {
   const [logFrom,     setLogFrom]     = useState('');
   const [logTo,       setLogTo]       = useState('');
 
+  // Scan log pagination
+  const [scanSearch,   setScanSearch]   = useState('');
+  const [scanPageSize, setScanPageSize] = useState(10);
+  const [scanPage,     setScanPage]     = useState(1);
+
+  // On-premises pagination
+  const [premisesSearch,   setPremisesSearch]   = useState('');
+  const [premisesPageSize, setPremisesPageSize] = useState(10);
+  const [premisesPage,     setPremisesPage]     = useState(1);
+
   // Auto-focus input on scanner tab
   useEffect(() => {
     if (tab === 'scanner') inputRef.current?.focus();
@@ -219,6 +229,37 @@ export default function GateScansPage() {
       notes:         notes         || undefined,
     });
   };
+
+  // ── Scan log pagination ────────────────────────────────────────────────────
+  const scanFiltered = scans.filter(s => {
+    const q = scanSearch.toLowerCase();
+    return (
+      (s.trip?.customerVehicleRegistration ?? s.trackingCode).toLowerCase().includes(q) ||
+      (s.trip?.customer?.name ?? '').toLowerCase().includes(q) ||
+      (s.officerName ?? '').toLowerCase().includes(q)
+    );
+  });
+  const scanTotalPages = Math.max(1, Math.ceil(scanFiltered.length / scanPageSize));
+  const scanSafePage = Math.min(scanPage, scanTotalPages);
+  const scanStart = (scanSafePage - 1) * scanPageSize;
+  const scanPageRows = scanFiltered.slice(scanStart, scanStart + scanPageSize);
+  const scanShowingFrom = scanFiltered.length === 0 ? 0 : scanStart + 1;
+  const scanShowingTo = Math.min(scanStart + scanPageSize, scanFiltered.length);
+
+  // ── On-premises pagination ─────────────────────────────────────────────────
+  const premisesFiltered = onPremises.filter(s => {
+    const q = premisesSearch.toLowerCase();
+    return (
+      (s.trip?.customerVehicleRegistration ?? '').toLowerCase().includes(q) ||
+      (s.trip?.customer?.name ?? '').toLowerCase().includes(q)
+    );
+  });
+  const premisesTotalPages = Math.max(1, Math.ceil(premisesFiltered.length / premisesPageSize));
+  const premisesSafePage = Math.min(premisesPage, premisesTotalPages);
+  const premisesStart = (premisesSafePage - 1) * premisesPageSize;
+  const premisesPageRows = premisesFiltered.slice(premisesStart, premisesStart + premisesPageSize);
+  const premisesShowingFrom = premisesFiltered.length === 0 ? 0 : premisesStart + 1;
+  const premisesShowingTo = Math.min(premisesStart + premisesPageSize, premisesFiltered.length);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -548,6 +589,19 @@ export default function GateScansPage() {
             <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
           ) : (
             <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Show</span>
+                  <select value={scanPageSize} onChange={e => { setScanPageSize(Number(e.target.value)); setScanPage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span>entries</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Search:</span>
+                  <input value={scanSearch} onChange={e => { setScanSearch(e.target.value); setScanPage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -564,9 +618,9 @@ export default function GateScansPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {scans.length === 0 ? (
+                    {scanPageRows.length === 0 ? (
                       <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">No scans found.</td></tr>
-                    ) : scans.map(s => (
+                    ) : scanPageRows.map(s => (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${s.scanType === 'ENTRY' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -603,6 +657,16 @@ export default function GateScansPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+                <span>{scanFiltered.length === 0 ? 'No entries' : `Showing ${scanShowingFrom} to ${scanShowingTo} of ${scanFiltered.length} entries`}</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setScanPage(p => Math.max(1, p - 1))} disabled={scanSafePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+                  {Array.from({ length: scanTotalPages }, (_, i) => i + 1).map(n => (
+                    <button key={n} onClick={() => setScanPage(n)} className={`px-3 py-1 border rounded text-sm ${scanSafePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+                  ))}
+                  <button onClick={() => setScanPage(p => Math.min(scanTotalPages, p + 1))} disabled={scanSafePage === scanTotalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -622,6 +686,19 @@ export default function GateScansPage() {
             <div className="flex flex-col justify-center h-40 items-center gap-2"><Loader2 className="animate-spin text-brand-600" size={28} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>
           ) : (
             <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Show</span>
+                  <select value={premisesPageSize} onChange={e => { setPremisesPageSize(Number(e.target.value)); setPremisesPage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span>entries</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Search:</span>
+                  <input value={premisesSearch} onChange={e => { setPremisesSearch(e.target.value); setPremisesPage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -637,9 +714,9 @@ export default function GateScansPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {onPremises.length === 0 ? (
+                    {premisesPageRows.length === 0 ? (
                       <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No vehicles currently on premises.</td></tr>
-                    ) : onPremises.map(s => (
+                    ) : premisesPageRows.map(s => (
                       <tr key={s.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-900">{s.trip?.customerVehicleRegistration ?? '—'}</p>
@@ -674,6 +751,16 @@ export default function GateScansPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+                <span>{premisesFiltered.length === 0 ? 'No entries' : `Showing ${premisesShowingFrom} to ${premisesShowingTo} of ${premisesFiltered.length} entries`}</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPremisesPage(p => Math.max(1, p - 1))} disabled={premisesSafePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+                  {Array.from({ length: premisesTotalPages }, (_, i) => i + 1).map(n => (
+                    <button key={n} onClick={() => setPremisesPage(n)} className={`px-3 py-1 border rounded text-sm ${premisesSafePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+                  ))}
+                  <button onClick={() => setPremisesPage(p => Math.min(premisesTotalPages, p + 1))} disabled={premisesSafePage === premisesTotalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+                </div>
               </div>
             </div>
           )}
