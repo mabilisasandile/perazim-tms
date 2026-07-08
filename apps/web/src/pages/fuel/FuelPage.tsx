@@ -142,6 +142,7 @@ export default function FuelPage() {
                 <th className="px-4 py-3 text-left">Cost/L</th>
                 <th className="px-4 py-3 text-left">Total</th>
                 <th className="px-4 py-3 text-left">Odometer</th>
+                <th className="px-4 py-3 text-left">Comments</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -161,6 +162,7 @@ export default function FuelPage() {
                   <td className="px-4 py-3 text-gray-700">{fmt(Number(r.costPerLitre || 0))}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{fmt(Number(r.totalCost || 0))}</td>
                   <td className="px-4 py-3 text-gray-500">{r.odometer ? `${r.odometer.toLocaleString()} km` : '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{r.notes ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => { if (confirm('Delete this fuel record?')) deleteMut.mutate(r.id); }}
                       className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>

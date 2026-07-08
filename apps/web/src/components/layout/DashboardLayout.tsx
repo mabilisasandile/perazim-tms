@@ -4,7 +4,7 @@ import {
   FileText, Receipt, Fuel, Settings, LogOut, Menu, X,
   Container, Bell, TrendingUp, ShieldCheck, CreditCard,
   ClipboardList, Search, History, Building2, ScanLine, BadgeCheck, UserCheck, Wallet, BellRing, BarChart2,
-  Map, MapPin,
+  Map, MapPin, CalendarCheck,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/app/trailers',         icon: Container,       label: 'Perazim Trailers' },
   { to: '/app/drivers',          icon: Users,           label: 'Drivers' },
   { to: '/app/trips',            icon: Route,           label: 'Trips' },
+  { to: '/app/bookings',         icon: CalendarCheck,   label: 'Bookings' },
   { to: '/app/customers',        icon: UserCircle,      label: 'Customers' },
   { to: '/app/quotations',       icon: FileText,        label: 'Quotations' },
   { to: '/app/invoices',         icon: Receipt,         label: 'Invoices' },

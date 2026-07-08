@@ -22,6 +22,8 @@ import VehicleDetailPage  from './pages/vehicles/VehicleDetailPage';
 import TrailersPage       from './pages/trailers/TrailersPage';
 import DriversPage        from './pages/drivers/DriversPage';
 import TripsPage          from './pages/trips/TripsPage';
+import BookingsListPage    from './pages/bookings/BookingsListPage';
+import AddBookingPage      from './pages/bookings/AddBookingPage';
 import CustomersPage      from './pages/customers/CustomersPage';
 import QuotationsPage     from './pages/quotations/QuotationsPage';
 import InvoicesPage       from './pages/invoices/InvoicesPage';
@@ -113,6 +115,8 @@ export default function App() {
           <Route path="trailers/*"       element={<TrailersPage />} />
           <Route path="drivers/*"        element={<DriversPage />} />
           <Route path="trips/*"          element={<TripsPage />} />
+          <Route path="bookings"         element={<BookingsListPage />} />
+          <Route path="bookings/add"     element={<AddBookingPage />} />
           <Route path="customers/*"      element={<CustomersPage />} />
           <Route path="quotations/*"     element={<QuotationsPage />} />
           <Route path="invoices/*"       element={<InvoicesPage />} />

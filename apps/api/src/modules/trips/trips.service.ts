@@ -56,7 +56,7 @@ export const tripsService = {
   },
 
   async create(data: CreateTripDto, createdById: number) {
-    const { legs, ...tripData } = data;
+    const { legs, sendConfirmationEmail, ...tripData } = data;
 
     const settings = await prisma.settings.findFirst();
     const vatRate = settings?.vat ?? 15;
@@ -102,7 +102,9 @@ export const tripsService = {
         include: { customer: true, driver: true },
       }).then(fullTrip => {
         if (!fullTrip) return;
-        notificationService.dispatch('BOOKING_UPDATE', { trip: fullTrip }).catch(() => {});
+        if (sendConfirmationEmail !== false) {
+          notificationService.dispatch('BOOKING_UPDATE', { trip: fullTrip }).catch(() => {});
+        }
         if (fullTrip.driverId) {
           notificationService.dispatch('TRIP_ALLOCATION', { trip: fullTrip }).catch(() => {});
         }
@@ -177,6 +179,11 @@ export const tripsService = {
   async remove(id: number) {
     await this.findById(id);
     return prisma.trip.delete({ where: { id } });
+  },
+
+  async addPictures(id: number, pictures: Record<string, string>) {
+    await this.findById(id);
+    return prisma.trip.update({ where: { id }, data: pictures });
   },
 
   async getDriverTrips(driverId: number) {

@@ -18,7 +18,10 @@ interface Reminder {
 }
 
 const schema = z.object({
-  vehicleId:   z.coerce.number().int().positive().optional().nullable(),
+  vehicleId:   z.preprocess(
+    v => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int().positive().optional(),
+  ),
   title:       z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   dueDate:     z.string().min(1, 'Due date is required'),

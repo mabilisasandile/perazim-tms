@@ -86,6 +86,21 @@ export const tripsController = {
     } catch (err) { next(err); }
   },
 
+  async uploadPictures(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const pictures: Record<string, string> = {};
+      for (let i = 1; i <= 8; i++) {
+        const field = `picture${i}`;
+        const file = files?.[field]?.[0];
+        if (file) pictures[field] = `/uploads/trips/${file.filename}`;
+      }
+      const trip = await tripsService.addPictures(id, pictures);
+      res.json(trip);
+    } catch (err) { next(err); }
+  },
+
   async remove(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const id = Number(req.params.id);

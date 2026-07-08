@@ -10,7 +10,7 @@ const COOKIE_OPTIONS = {
 };
 
 export const generateTokens = (userId: number, username: string, sessionMinutes?: number) => {
-  const accessExpiry  = sessionMinutes ? `${sessionMinutes}m` : (process.env.JWT_EXPIRES_IN  || '15m');
+  const accessExpiry  = sessionMinutes ? `${sessionMinutes}m` : (process.env.JWT_EXPIRES_IN  || '30m');
   const refreshExpiry = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
   const sign = (payload: object, secret: string, expiry: string) =>
     jwt.sign(payload, secret, { expiresIn: expiry } as jwt.SignOptions);
@@ -30,8 +30,8 @@ export const authService = {
     // Fetch security policy
     const settings = await prisma.settings.findFirst();
     const maxAttempts  = settings?.maxLoginAttempts  ?? 5;
-    const lockoutMins  = settings?.lockoutMinutes    ?? 30;
-    const sessionMins  = settings?.sessionTimeoutMinutes ?? 15;
+    const lockoutMins  = settings?.lockoutMinutes    ?? 15;
+    const sessionMins  = settings?.sessionTimeoutMinutes ?? 30;
 
     if (!user) throw new AppError('Invalid username or password', 401);
 
@@ -92,7 +92,7 @@ export const authService = {
     if (!user) throw new AppError('User not found', 401);
 
     const settings = await prisma.settings.findFirst();
-    const sessionMins = settings?.sessionTimeoutMinutes ?? 15;
+    const sessionMins = settings?.sessionTimeoutMinutes ?? 30;
 
     return generateTokens(user.id, user.username, sessionMins);
   },

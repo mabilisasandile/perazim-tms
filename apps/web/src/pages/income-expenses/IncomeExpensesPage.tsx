@@ -11,9 +11,13 @@ import { format } from 'date-fns';
 
 interface Entry { id:number; type:'INCOME'|'EXPENSE'; description:string; amount:string|number; date:string; vehicle:{id:number;name:string;registrationNo:string}|null; }
 interface Summary { income:{count:number;total:number}; expense:{count:number;total:number}; net:number; }
+interface DriverExpense { id:number; description:string; amount:string|number; date:string; driver:{id:number;name:string}|null; }
 
 const schema = z.object({
-  vehicleId:   z.coerce.number().int().positive().optional().nullable(),
+  vehicleId:   z.preprocess(
+    v => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+    z.number().int().positive().optional(),
+  ),
   type:        z.enum(['INCOME','EXPENSE']),
   description: z.string().min(1,'Description is required'),
   amount:      z.coerce.number().positive('Amount must be positive'),
@@ -31,6 +35,14 @@ export default function IncomeExpensesPage() {
   const [typeFilter, setTypeFilter] = useState<''|'INCOME'|'EXPENSE'>('');
   const [vFilter, setVFilter] = useState<number|undefined>();
 
+  const [ieSearch, setIeSearch] = useState('');
+  const [iePageSize, setIePageSize] = useState(10);
+  const [iePage, setIePage] = useState(1);
+
+  const [deSearch, setDeSearch] = useState('');
+  const [dePageSize, setDePageSize] = useState(10);
+  const [dePage, setDePage] = useState(1);
+
   const { data:entries=[], isLoading, isError } = useQuery<Entry[]>({
     queryKey:['income-expenses',typeFilter,vFilter],
     queryFn:()=>api.get('/income-expenses',{params:{...(typeFilter&&{type:typeFilter}),...(vFilter&&{vehicleId:vFilter})}}).then(r=>norm(r.data)),
@@ -43,6 +55,10 @@ export default function IncomeExpensesPage() {
     queryKey:['vehicles-select'],
     queryFn:()=>api.get('/vehicles').then(r=>norm(r.data).filter((v:any)=>v.isActive)),
   });
+  const { data:driverExpenses=[], isLoading:deLoading, isError:deIsError } = useQuery<DriverExpense[]>({
+    queryKey:['driver-expenses'],
+    queryFn:()=>api.get('/driver-expenses').then(r=>norm(r.data)),
+  });
 
   const { register, handleSubmit, reset, formState:{errors,isSubmitting} } = useForm<FormData>({
     resolver:zodResolver(schema), defaultValues:{type:'EXPENSE'},
@@ -53,13 +69,43 @@ export default function IncomeExpensesPage() {
   const deleteMut = useMutation({ mutationFn:(id:number)=>api.delete(`/income-expenses/${id}`), onSuccess:()=>{ qc.invalidateQueries({queryKey:['income-expenses']}); qc.invalidateQueries({queryKey:['income-expenses-summary']}); }});
 
   const openAdd=()=>{ setEditing(null); reset({type:'EXPENSE',description:'',date:new Date().toISOString().split('T')[0]}); setModalOpen(true); };
-  const openEdit=(e:Entry)=>{ setEditing(e); reset({type:e.type,description:e.description,amount:Number(e.amount),date:e.date.split('T')[0],vehicleId:e.vehicle?.id??null}); setModalOpen(true); };
+  const openEdit=(e:Entry)=>{ setEditing(e); reset({type:e.type,description:e.description,amount:Number(e.amount),date:e.date.split('T')[0],vehicleId:e.vehicle?.id??undefined}); setModalOpen(true); };
   const close=()=>{ setModalOpen(false); setEditing(null); };
 
   if(isLoading) return <div className="flex flex-col items-center justify-center h-64 gap-3"><Loader2 className="animate-spin text-brand-600" size={32}/><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
   if(isError) return <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20}/><span>Failed to load records.</span></div>;
 
   const inp='w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+
+  const ieFiltered = entries.filter(e => {
+    const q = ieSearch.toLowerCase();
+    return (
+      (e.description ?? '').toLowerCase().includes(q) ||
+      (e.vehicle?.name ?? '').toLowerCase().includes(q) ||
+      (e.vehicle?.registrationNo ?? '').toLowerCase().includes(q) ||
+      (e.type === 'INCOME' ? 'income' : 'expense').includes(q)
+    );
+  });
+  const ieTotalPages = Math.max(1, Math.ceil(ieFiltered.length / iePageSize));
+  const ieSafePage = Math.min(iePage, ieTotalPages);
+  const ieStart = (ieSafePage - 1) * iePageSize;
+  const iePageRows = ieFiltered.slice(ieStart, ieStart + iePageSize);
+  const ieShowingFrom = ieFiltered.length === 0 ? 0 : ieStart + 1;
+  const ieShowingTo = Math.min(ieStart + iePageSize, ieFiltered.length);
+
+  const deFiltered = driverExpenses.filter(e => {
+    const q = deSearch.toLowerCase();
+    return (
+      (e.description ?? '').toLowerCase().includes(q) ||
+      (e.driver?.name ?? '').toLowerCase().includes(q)
+    );
+  });
+  const deTotalPages = Math.max(1, Math.ceil(deFiltered.length / dePageSize));
+  const deSafePage = Math.min(dePage, deTotalPages);
+  const deStart = (deSafePage - 1) * dePageSize;
+  const dePageRows = deFiltered.slice(deStart, deStart + dePageSize);
+  const deShowingFrom = deFiltered.length === 0 ? 0 : deStart + 1;
+  const deShowingTo = Math.min(deStart + dePageSize, deFiltered.length);
 
   return (
     <div className="space-y-6">
@@ -88,19 +134,32 @@ export default function IncomeExpensesPage() {
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex gap-2">
           {(['','INCOME','EXPENSE'] as const).map(t=>(
-            <button key={t} onClick={()=>setTypeFilter(t)}
+            <button key={t} onClick={()=>{ setTypeFilter(t); setIePage(1); }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${typeFilter===t?'bg-brand-600 text-white':'bg-white border text-gray-600 hover:border-brand-500'}`}>
               {t===''?'All':t==='INCOME'?'Income':'Expenses'}
             </button>
           ))}
         </div>
-        <select value={vFilter??''} onChange={e=>setVFilter(e.target.value?+e.target.value:undefined)} className={`${inp} w-auto`}>
+        <select value={vFilter??''} onChange={e=>{ setVFilter(e.target.value?+e.target.value:undefined); setIePage(1); }} className={`${inp} w-auto`}>
           <option value="">All Vehicles</option>
           {vehicles.map(v=><option key={v.id} value={v.id}>{v.name} ({v.registrationNo})</option>)}
         </select>
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Show</span>
+            <select value={iePageSize} onChange={e => { setIePageSize(Number(e.target.value)); setIePage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span>entries</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Search:</span>
+            <input value={ieSearch} onChange={e => { setIeSearch(e.target.value); setIePage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
@@ -110,9 +169,9 @@ export default function IncomeExpensesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {entries.length===0
+            {iePageRows.length===0
               ? <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No entries found.</td></tr>
-              : entries.map(e=>(
+              : iePageRows.map(e=>(
               <tr key={e.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{format(new Date(e.date),'dd MMM yyyy')}</td>
                 <td className="px-4 py-3"><Badge label={e.type==='INCOME'?'Income':'Expense'} variant={e.type==='INCOME'?'green':'red'}/></td>
@@ -131,6 +190,75 @@ export default function IncomeExpensesPage() {
             ))}
           </tbody>
         </table>
+
+        <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+          <span>{ieFiltered.length === 0 ? 'No entries' : `Showing ${ieShowingFrom} to ${ieShowingTo} of ${ieFiltered.length} entries`}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setIePage(p => Math.max(1, p - 1))} disabled={ieSafePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+            {Array.from({ length: ieTotalPages }, (_, i) => i + 1).map(n => (
+              <button key={n} onClick={() => setIePage(n)} className={`px-3 py-1 border rounded text-sm ${ieSafePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+            ))}
+            <button onClick={() => setIePage(p => Math.min(ieTotalPages, p + 1))} disabled={ieSafePage === ieTotalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold text-gray-900">Driver Expenses</h2>
+        {deIsError
+          ? <div className="flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-xl"><AlertCircle size={20}/><span>Failed to load driver expenses.</span></div>
+          : (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Show</span>
+                <select value={dePageSize} onChange={e => { setDePageSize(Number(e.target.value)); setDePage(1); }} className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span>entries</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Search:</span>
+                <input value={deSearch} onChange={e => { setDeSearch(e.target.value); setDePage(1); }} className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                <tr>
+                  <th className="px-4 py-3 text-left">Driver</th><th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 text-left">Type</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {deLoading
+                  ? <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400"><Loader2 className="animate-spin inline mr-2" size={16}/>Loading...</td></tr>
+                  : dePageRows.length===0
+                  ? <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">No entries found.</td></tr>
+                  : dePageRows.map(e=>(
+                  <tr key={e.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">{e.driver?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{format(new Date(e.date),'dd MMM yyyy')}</td>
+                    <td className="px-4 py-3">{e.description}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-red-600">{fmt(Number(e.amount))}</td>
+                    <td className="px-4 py-3"><Badge label="Expense" variant="red"/></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
+              <span>{deFiltered.length === 0 ? 'No entries' : `Showing ${deShowingFrom} to ${deShowingTo} of ${deFiltered.length} entries`}</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setDePage(p => Math.max(1, p - 1))} disabled={deSafePage === 1} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Previous</button>
+                {Array.from({ length: deTotalPages }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setDePage(n)} className={`px-3 py-1 border rounded text-sm ${deSafePage === n ? 'bg-brand-600 text-white border-brand-600' : 'hover:bg-gray-50'}`}>{n}</button>
+                ))}
+                <button onClick={() => setDePage(p => Math.min(deTotalPages, p + 1))} disabled={deSafePage === deTotalPages} className="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed">Next</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal title={editing?'Edit Entry':'Add Entry'} open={modalOpen} onClose={close}>
