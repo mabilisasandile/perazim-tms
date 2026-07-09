@@ -143,6 +143,12 @@ export const invoicesService = {
     return prisma.invoice.delete({ where: { id } });
   },
 
+  async emailInvoice(id: number) {
+    const inv = await this.findById(id);
+    await notificationService.dispatch('INVOICE_NOTIFICATION', { invoice: inv });
+    return { message: 'Invoice email sent', email: inv.customer?.email ?? null };
+  },
+
   async markOverdue() {
     const now = new Date();
     const result = await prisma.invoice.updateMany({

@@ -106,6 +106,22 @@ router.get('/:id/payments', async (req, res, next) => {
   try { res.json(await invoicesService.getPayments(+req.params.id)); } catch (e) { next(e); }
 });
 
+// ── (Re)send invoice email to customer ──────────────────────────────────────────
+router.post('/:id/email', async (req: AuthRequest, res, next) => {
+  try {
+    const id = +req.params.id;
+    const result = await invoicesService.emailInvoice(id);
+    res.json(result);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'INVOICE_EMAILED',
+      entityType: 'INVOICE',
+      entityId:   id,
+    });
+  } catch (e) { next(e); }
+});
+
 // ── Mark overdue ───────────────────────────────────────────────────────────────
 router.post('/mark-overdue', async (_req, res, next) => {
   try { res.json(await invoicesService.markOverdue()); } catch (e) { next(e); }

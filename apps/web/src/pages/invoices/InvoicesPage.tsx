@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -134,13 +135,12 @@ const statusMeta: Record<string, { label: string; variant: 'red' | 'green' | 'ye
 
 export default function InvoicesPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [modalOpen,       setModalOpen]       = useState(false);
   const [bulkModalOpen,   setBulkModalOpen]   = useState(false);
-  const [viewInvoice,     setViewInvoice]     = useState<Invoice | null>(null);
   const [paymentInvoice,  setPaymentInvoice]  = useState<Invoice | null>(null);
   const [historyInvoice,  setHistoryInvoice]  = useState<Invoice | null>(null);
   const [statusFilter,    setStatusFilter]    = useState('');
-  const [activeTab,       setActiveTab]       = useState<'details' | 'items' | 'history'>('details');
   const [search,          setSearch]          = useState('');
   const [pageSize,        setPageSize]        = useState(10);
   const [page,            setPage]            = useState(1);
@@ -417,7 +417,7 @@ export default function InvoicesPage() {
                     <td className="px-4 py-3"><Badge label={sm.label} variant={sm.variant} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => { setViewInvoice(inv); setActiveTab('details'); }} title="View" className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
+                        <button onClick={() => navigate(`/app/invoices/${inv.id}/view`)} title="View" className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
                         <button onClick={() => setPaymentInvoice(inv)} title="Record Payment" className="p-1.5 text-gray-400 hover:text-green-600"><CreditCard size={16} /></button>
                         <button onClick={() => { setHistoryInvoice(inv); }} title="Payment History" className="p-1.5 text-gray-400 hover:text-blue-600"><History size={16} /></button>
                         {inv.status !== 'paid' && (
@@ -595,109 +595,6 @@ export default function InvoicesPage() {
         </Modal>
       )}
 
-      {/* ── View Invoice Modal ── */}
-      {viewInvoice && (
-        <Modal title={`Invoice ${viewInvoice.number}`} open={!!viewInvoice} onClose={() => setViewInvoice(null)}>
-          {/* Tabs */}
-          <div className="flex gap-1 mb-4 border-b">
-            {(['details', 'items', 'history'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${activeTab === tab ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'details' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-gray-500">Customer</p><p className="font-medium">{viewInvoice.customer?.name ?? '—'}</p></div>
-                <div>
-                  <p className="text-gray-500">Status</p>
-                  <div className="mt-1">
-                    <Badge label={statusMeta[viewInvoice.status]?.label ?? viewInvoice.status} variant={statusMeta[viewInvoice.status]?.variant ?? 'yellow'} />
-                    {viewInvoice.customer?.payLaterApproved && (
-                      <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Pay-Later</span>
-                    )}
-                  </div>
-                </div>
-                {[
-                  ['Amount (excl. VAT)', fmt(Number(viewInvoice.amount || 0))],
-                  ['VAT',               fmt(Number(viewInvoice.vatAmount || 0))],
-                  ['Total',             fmt(Number(viewInvoice.total || 0))],
-                  ['Amount Paid',       fmt(Number(viewInvoice.amountPaid || 0))],
-                  ['Outstanding',       fmt(balance(viewInvoice))],
-                  ['Due Date',          safeDate(viewInvoice.dueDate, 'dd MMM yyyy')],
-                  ['Paid At',           safeDate(viewInvoice.paidAt, 'dd MMM yyyy')],
-                  ['Created',           safeDate(viewInvoice.createdAt, 'dd MMM yyyy')],
-                ].map(([label, value]) => (
-                  <div key={label as string}>
-                    <p className="text-gray-500">{label}</p>
-                    <p className="font-medium">{value}</p>
-                  </div>
-                ))}
-              </div>
-              {viewInvoice.depositRequired && (
-                <div className="p-3 bg-orange-50 rounded-lg text-sm">
-                  <p className="font-medium text-orange-800">Deposit Tracking</p>
-                  <div className="grid grid-cols-3 gap-2 mt-1 text-xs text-orange-700">
-                    <div><span className="text-gray-500">Required: </span>{fmt(Number(viewInvoice.depositRequired))}</div>
-                    <div><span className="text-gray-500">Paid: </span>{fmt(Number(viewInvoice.depositPaid))}</div>
-                    <div><span className="text-gray-500">Remaining: </span>{fmt(depositRemaining(viewInvoice) ?? 0)}</div>
-                  </div>
-                </div>
-              )}
-              {viewInvoice.vehicleDescription && (
-                <div><p className="text-gray-500 text-sm">Vehicle</p><p className="font-medium text-sm">{viewInvoice.vehicleDescription}</p></div>
-              )}
-              {viewInvoice.notes && (
-                <div><p className="text-gray-500 text-sm">Notes</p><p className="text-sm">{viewInvoice.notes}</p></div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'items' && (
-            <div>
-              {(!viewInvoice.items || viewInvoice.items.length === 0) ? (
-                <p className="text-sm text-gray-400 text-center py-6">No line items on this invoice.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="text-gray-500 text-xs uppercase bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Description</th>
-                      <th className="px-3 py-2 text-left">Condition</th>
-                      <th className="px-3 py-2 text-right">Qty</th>
-                      <th className="px-3 py-2 text-right">Unit Price</th>
-                      <th className="px-3 py-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {viewInvoice.items.map(item => (
-                      <tr key={item.id}>
-                        <td className="px-3 py-2">{item.description}</td>
-                        <td className="px-3 py-2">
-                          {item.vehicleCondition && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${item.vehicleCondition === 'Non-Runner' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                              {item.vehicleCondition}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right">{fmt(Number(item.unitPrice))}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{fmt(Number(item.total))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'history' && (
-            <PaymentHistoryPanel invoiceId={viewInvoice.id} />
-          )}
-        </Modal>
-      )}
     </div>
   );
 }
@@ -874,51 +771,5 @@ function InvoiceForm({
         </button>
       </div>
     </form>
-  );
-}
-
-/* ── Inline payment history panel (used inside view modal) ───────────────────── */
-
-function PaymentHistoryPanel({ invoiceId }: { invoiceId: number }) {
-  const { data: payments = [], isLoading } = useQuery<InvoicePayment[]>({
-    queryKey: ['invoice-payments', invoiceId],
-    queryFn: () => api.get(`/invoices/${invoiceId}/payments`).then(r => normalizeList(r.data)),
-  });
-
-  if (isLoading) return <div className="flex flex-col items-center justify-center py-6 gap-2"><Loader2 className="animate-spin" size={20} /><p className="text-sm text-gray-400 font-medium tracking-wide animate-pulse">Loading...</p></div>;
-  if (payments.length === 0) return <p className="text-sm text-gray-400 text-center py-6">No payments recorded yet.</p>;
-
-  return (
-    <div className="space-y-2">
-      {payments.map(p => (
-        <div key={p.id} className="border rounded-lg p-3 text-sm">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.type === 'DEPOSIT' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                {p.type}
-              </span>
-              <span className="font-semibold">
-                {new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(p.amount))}
-              </span>
-              <span className="text-gray-400 capitalize">{p.method}</span>
-            </div>
-            <span className="text-gray-400 text-xs">
-              {(() => {
-                const d = new Date(p.createdAt);
-                return isNaN(d.getTime()) ? '—' : format(d, 'dd MMM yyyy HH:mm');
-              })()}
-            </span>
-          </div>
-          {p.reference && <p className="text-gray-500 text-xs">Ref: {p.reference}</p>}
-          {p.notes && <p className="text-gray-500 text-xs">{p.notes}</p>}
-          {p.proofPath && (
-            <a href={p.proofPath} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline mt-1">
-              <Upload size={12} /> View Proof of Payment
-            </a>
-          )}
-        </div>
-      ))}
-    </div>
   );
 }

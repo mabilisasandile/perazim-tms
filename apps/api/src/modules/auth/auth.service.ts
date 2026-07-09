@@ -101,10 +101,10 @@ export const authService = {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { permissions: true },
-      omit: { password: true } as any,
     });
     if (!user) throw new AppError('User not found', 404);
-    return user;
+    const { password: _, ...safeUser } = user;
+    return safeUser;
   },
 
   cookieOptions: {

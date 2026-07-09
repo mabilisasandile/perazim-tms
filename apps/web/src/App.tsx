@@ -27,6 +27,7 @@ import AddBookingPage      from './pages/bookings/AddBookingPage';
 import CustomersPage      from './pages/customers/CustomersPage';
 import QuotationsPage     from './pages/quotations/QuotationsPage';
 import InvoicesPage       from './pages/invoices/InvoicesPage';
+import InvoiceViewPage    from './pages/invoices/InvoiceViewPage';
 import FuelPage           from './pages/fuel/FuelPage';
 import IncomeExpensesPage from './pages/income-expenses/IncomeExpensesPage';
 import RemindersPage      from './pages/reminders/RemindersPage';
@@ -119,6 +120,7 @@ export default function App() {
           <Route path="bookings/add"     element={<AddBookingPage />} />
           <Route path="customers/*"      element={<CustomersPage />} />
           <Route path="quotations/*"     element={<QuotationsPage />} />
+          <Route path="invoices/:id/view" element={<InvoiceViewPage />} />
           <Route path="invoices/*"       element={<InvoicesPage />} />
           <Route path="fuel/*"           element={<FuelPage />} />
           <Route path="income-expenses/*" element={<IncomeExpensesPage />} />

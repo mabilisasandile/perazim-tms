@@ -114,7 +114,11 @@ export default function UsersPage() {
 
   const openAdd  = () => { setEditing(null); setFormError(null); reset({ name:'', email:'', username:'', password:'', role:'ADMIN', isActive:true }); setModalOpen(true); };
   const openEdit = (u: User) => { setEditing(u); setFormError(null); reset({ name:u.name, email:u.email, username:u.username, role:u.role as any, isActive:u.isActive, password:'' }); setModalOpen(true); };
-  const openPerms = (u: User) => { setPermUser(u); setLocalPerms(u.permissions ?? {}); };
+  const openPerms = (u: User) => {
+    setPermUser(u);
+    const keys = PERM_GROUPS.flatMap(g => g.keys);
+    setLocalPerms(Object.fromEntries(keys.map(k => [k, !!u.permissions?.[k]])));
+  };
   const openRole  = (u: User) => { setRoleUser(u); setRoleChoice(u.role); };
   const close = () => { setModalOpen(false); setEditing(null); setFormError(null); };
 
