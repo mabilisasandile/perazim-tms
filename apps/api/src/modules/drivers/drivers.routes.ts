@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, AuthRequest } from '../../middleware/authenticate';
+import { authenticate, AuthRequest, requirePermission } from '../../middleware/authenticate';
 import { authenticateDriver, DriverRequest } from '../../middleware/authenticateDriver';
 import { driversService } from './drivers.service';
 import { createDriverSchema, updateDriverSchema } from './drivers.schema';
@@ -151,10 +151,10 @@ router.get('/portal/trips', authenticateDriver, async (req: DriverRequest, res, 
 
 router.use(authenticate);
 
-router.get('/',    async (_req, res, next) => { try { res.json(await driversService.findAll()); }           catch(e) { next(e); } });
-router.get('/:id', async (req,  res, next) => { try { res.json(await driversService.findById(+req.params.id)); } catch(e) { next(e); } });
+router.get('/',    requirePermission('driverList'), async (_req, res, next) => { try { res.json(await driversService.findAll()); }           catch(e) { next(e); } });
+router.get('/:id', requirePermission('driverList'), async (req,  res, next) => { try { res.json(await driversService.findById(+req.params.id)); } catch(e) { next(e); } });
 
-router.post('/', async (req: AuthRequest, res, next) => {
+router.post('/', requirePermission('driverAdd'), async (req: AuthRequest, res, next) => {
   try {
     const driver = await driversService.create(createDriverSchema.parse(req.body));
     res.status(201).json(driver);
@@ -169,7 +169,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.put('/:id', async (req: AuthRequest, res, next) => {
+router.put('/:id', requirePermission('driverEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const oldDriver = await driversService.findById(id);
@@ -187,7 +187,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.delete('/:id', async (req: AuthRequest, res, next) => {
+router.delete('/:id', requirePermission('driverEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const oldDriver = await driversService.findById(id);

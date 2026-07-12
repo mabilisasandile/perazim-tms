@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, Loader2, AlertCircle, TrendingUp, TrendingDown, D
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { format } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Entry { id:number; type:'INCOME'|'EXPENSE'; description:string; amount:string|number; date:string; vehicle:{id:number;name:string;registrationNo:string}|null; }
 interface Summary { income:{count:number;total:number}; expense:{count:number;total:number}; net:number; }
@@ -29,6 +30,7 @@ const fmt = (n:number) => new Intl.NumberFormat('en-ZA',{style:'currency',curren
 const norm = (r:unknown):any[] => { if(Array.isArray(r)) return r; if(r&&typeof r==='object') for(const k of['data','items','results']) if(Array.isArray((r as any)[k])) return (r as any)[k]; return []; };
 
 export default function IncomeExpensesPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Entry|null>(null);
@@ -111,7 +113,9 @@ export default function IncomeExpensesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Income & Expenses</h1>
-        <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg"><Plus size={16}/> Add Entry</button>
+        {hasPermission('incomeExpenseEdit') && (
+          <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg"><Plus size={16}/> Add Entry</button>
+        )}
       </div>
 
       {summary && (
@@ -182,8 +186,12 @@ export default function IncomeExpensesPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={()=>openEdit(e)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16}/></button>
-                    <button onClick={()=>confirm('Delete this entry?')&&deleteMut.mutate(e.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    {hasPermission('incomeExpenseEdit') && (
+                      <button onClick={()=>openEdit(e)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16}/></button>
+                    )}
+                    {hasPermission('incomeExpenseEdit') && (
+                      <button onClick={()=>confirm('Delete this entry?')&&deleteMut.mutate(e.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    )}
                   </div>
                 </td>
               </tr>

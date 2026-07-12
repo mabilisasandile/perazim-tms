@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, AuthRequest } from '../../middleware/authenticate';
+import { authenticate, AuthRequest, requirePermission } from '../../middleware/authenticate';
 import { authenticateCustomer, CustomerRequest } from '../../middleware/authenticateCustomer';
 import { customersService } from './customers.service';
 import { createCustomerSchema, updateCustomerSchema } from './customers.schema';
@@ -212,11 +212,11 @@ router.use(authenticate);
 
 // ── Admin-protected customer management ──────────────────────────────────────
 
-router.get('/',        async (_req, res, next) => { try { res.json(await customersService.findAll()); }                 catch(e) { next(e); } });
-router.get('/:id',     async (req,  res, next) => { try { res.json(await customersService.findById(+req.params.id)); }  catch(e) { next(e); } });
-router.get('/:id/trips', async (req, res, next) => { try { res.json(await customersService.getTrips(+req.params.id)); } catch(e) { next(e); } });
+router.get('/',        requirePermission('customerList'), async (_req, res, next) => { try { res.json(await customersService.findAll()); }                 catch(e) { next(e); } });
+router.get('/:id',     requirePermission('customerList'), async (req,  res, next) => { try { res.json(await customersService.findById(+req.params.id)); }  catch(e) { next(e); } });
+router.get('/:id/trips', requirePermission('customerList'), async (req, res, next) => { try { res.json(await customersService.getTrips(+req.params.id)); } catch(e) { next(e); } });
 
-router.post('/', async (req: AuthRequest, res, next) => {
+router.post('/', requirePermission('customerAdd'), async (req: AuthRequest, res, next) => {
   try {
     const customer = await customersService.create(createCustomerSchema.parse(req.body));
     res.status(201).json(customer);
@@ -231,7 +231,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.put('/:id', async (req: AuthRequest, res, next) => {
+router.put('/:id', requirePermission('customerEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const oldCustomer = await customersService.findById(id);
@@ -249,7 +249,7 @@ router.put('/:id', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.delete('/:id', async (req: AuthRequest, res, next) => {
+router.delete('/:id', requirePermission('customerEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const oldCustomer = await customersService.findById(id);
@@ -266,7 +266,7 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.patch('/:id/pay-later', async (req: AuthRequest, res, next) => {
+router.patch('/:id/pay-later', requirePermission('customerEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const { approved } = z.object({ approved: z.boolean() }).parse(req.body);
@@ -286,7 +286,7 @@ router.patch('/:id/pay-later', async (req: AuthRequest, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put('/:id/portal-password', async (req: AuthRequest, res, next) => {
+router.put('/:id/portal-password', requirePermission('customerEdit'), async (req: AuthRequest, res, next) => {
   try {
     const id = +req.params.id;
     const { password } = z.object({ password: z.string().min(8) }).parse(req.body);

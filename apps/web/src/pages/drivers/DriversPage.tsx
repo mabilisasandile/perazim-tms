@@ -12,6 +12,7 @@ import DriverDocsModal from './DriverDocsModal';
 import TimesheetsTab from './TimesheetsTab';
 import TripSheetsTab from './TripSheetsTab';
 import LoadSheetsTab from './LoadSheetsTab';
+import { useAuthStore } from '../../stores/authStore';
 
 /* ── helpers ─────────────────────────────────────────── */
 
@@ -99,6 +100,7 @@ interface TrailerOption { id: number; registrationNo: string; }
 type Tab = 'list' | 'timesheets' | 'tripsheets' | 'loadsheets';
 
 export default function DriversPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('list');
   const [modalOpen, setModalOpen] = useState(false);
@@ -184,7 +186,7 @@ export default function DriversPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Drivers</h1>
-        {tab === 'list' && (
+        {tab === 'list' && hasPermission('driverAdd') && (
           <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             <Plus size={16} /> Add Driver
           </button>
@@ -262,8 +264,12 @@ export default function DriversPage() {
                       <button onClick={() => setDocsDriverId(d.id)} title="Driver Profile & Documents"
                         className="p-1.5 text-gray-400 hover:text-brand-600"><FolderOpen size={16} /></button>
                       <button onClick={() => setViewDriver(d)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
-                      <button onClick={() => openEdit(d)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
-                      <button onClick={() => { if (confirm(`Delete driver "${d.name}"?`)) deleteMut.mutate(d.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                      {hasPermission('driverEdit') && (
+                        <button onClick={() => openEdit(d)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
+                      )}
+                      {hasPermission('driverEdit') && (
+                        <button onClick={() => { if (confirm(`Delete driver "${d.name}"?`)) deleteMut.mutate(d.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>

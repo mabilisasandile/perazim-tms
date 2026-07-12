@@ -105,7 +105,7 @@ export default function TripsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  const { hasRole } = useAuthStore();
+  const { hasRole, hasPermission } = useAuthStore();
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN');
 
   const { data: trips = [], isLoading, isError } = useQuery<Trip[]>({
@@ -303,9 +303,11 @@ export default function TripsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Trips</h1>
-        <button onClick={() => { reset(); setSelectedQuotationId(null); setFromCoords(null); setToCoords(null); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> New Trip
-        </button>
+        {hasPermission('tripAdd') && (
+          <button onClick={() => { reset(); setSelectedQuotationId(null); setFromCoords(null); setToCoords(null); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Plus size={16} /> New Trip
+          </button>
+        )}
       </div>
 
       {/* Status filter */}
@@ -371,13 +373,15 @@ export default function TripsPage() {
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setQrTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600" title="View QR Code"><QrCode size={15} /></button>
                         <button onClick={() => openViewTrip(t)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={15} /></button>
-                        {t.status === 'PENDING' && (
+                        {t.status === 'PENDING' && hasPermission('tripEdit') && (
                           <button onClick={() => statusMut.mutate({ id: t.id, status: 'IN_PROGRESS' })} className="p-1.5 text-gray-400 hover:text-blue-600" title="Start trip"><TruckIcon size={15} /></button>
                         )}
                         {t.status === 'IN_PROGRESS' && (
                           <button onClick={() => openViewTrip(t)} className="p-1.5 text-gray-400 hover:text-green-600" title="Complete trip (OTP required)"><CheckCircle2 size={15} /></button>
                         )}
-                        <button onClick={() => { if (confirm('Delete this trip?')) deleteMut.mutate(t.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                        {hasPermission('tripEdit') && (
+                          <button onClick={() => { if (confirm('Delete this trip?')) deleteMut.mutate(t.id); }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>

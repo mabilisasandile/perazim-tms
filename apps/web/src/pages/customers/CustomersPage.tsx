@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Customer {
   id: number;
@@ -40,6 +41,7 @@ type FormData = z.infer<typeof schema>;
 const INPUT = 'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 export default function CustomersPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -130,9 +132,11 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-        <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Add Customer
-        </button>
+        {hasPermission('customerAdd') && (
+          <button onClick={openAdd} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Plus size={16} /> Add Customer
+          </button>
+        )}
       </div>
 
       {deleteError && (
@@ -190,8 +194,12 @@ export default function CustomersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setViewCustomer(c)} className="p-1.5 text-gray-400 hover:text-brand-600"><Eye size={16} /></button>
-                      <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
-                      <button onClick={() => { if (confirm(`Delete "${c.name}"?`)) { setDeleteError(null); deleteMut.mutate(c.id); } }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                      {hasPermission('customerEdit') && (
+                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-brand-600"><Pencil size={16} /></button>
+                      )}
+                      {hasPermission('customerEdit') && (
+                        <button onClick={() => { if (confirm(`Delete "${c.name}"?`)) { setDeleteError(null); deleteMut.mutate(c.id); } }} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>

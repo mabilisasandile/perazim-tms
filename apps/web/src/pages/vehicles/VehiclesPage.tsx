@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, Loader2, AlertCircle, Eye, ChevronUp, ChevronDown
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { Link } from 'react-router-dom';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Vehicle {
   id: number;
@@ -45,6 +46,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 }
 
 export default function VehiclesPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -190,12 +192,14 @@ export default function VehiclesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Vehicles Management</h1>
           <p className="text-xs text-gray-400 mt-0.5">Dashboard / Vehicles Management</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus size={16} /> Add Vehicle
-        </button>
+        {hasPermission('vehicleAdd') && (
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} /> Add Vehicle
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden">
@@ -276,15 +280,21 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <Link to={`/app/vehicles/${v.id}`} className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors">
-                          <Eye size={16} />
-                        </Link>
-                        <button onClick={() => openEdit(v)} className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors">
-                          <Pencil size={16} />
-                        </button>
-                        <button onClick={() => confirmDelete(v)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
+                        {hasPermission('vehicleView') && (
+                          <Link to={`/app/vehicles/${v.id}`} className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors">
+                            <Eye size={16} />
+                          </Link>
+                        )}
+                        {hasPermission('vehicleEdit') && (
+                          <button onClick={() => openEdit(v)} className="p-1.5 text-gray-400 hover:text-brand-600 transition-colors">
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                        {hasPermission('vehicleEdit') && (
+                          <button onClick={() => confirmDelete(v)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

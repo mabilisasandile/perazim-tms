@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { format } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ function PageError({ msg }: { msg: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function TankersTab() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [addTankerOpen, setAddTankerOpen] = useState(false);
   const [allocateFor, setAllocateFor] = useState<Tanker | null>(null);
@@ -236,10 +238,12 @@ function TankersTab() {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={() => setAddTankerOpen(true)}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-          <Plus size={16} /> Add Tanker
-        </button>
+        {hasPermission('fuelAdd') && (
+          <button onClick={() => setAddTankerOpen(true)}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <Plus size={16} /> Add Tanker
+          </button>
+        )}
       </div>
 
       {/* Tanker cards */}
@@ -270,12 +274,16 @@ function TankersTab() {
                   <div className="flex items-center gap-3">
                     <Badge label={t.isActive ? 'Active' : 'Inactive'} color={t.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'} />
                     <span className="text-xs text-gray-400">{t._count.deliveries} deliveries</span>
-                    <button onClick={() => setAllocateFor(t)}
-                      className="text-xs text-brand-600 hover:text-brand-800 font-medium border border-brand-200 rounded px-2 py-1">
-                      + Add Compartment
-                    </button>
-                    <button onClick={() => { if (confirm('Delete this tanker?')) deleteTanker.mutate(t.id); }}
-                      className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    {hasPermission('fuelAdd') && (
+                      <button onClick={() => setAllocateFor(t)}
+                        className="text-xs text-brand-600 hover:text-brand-800 font-medium border border-brand-200 rounded px-2 py-1">
+                        + Add Compartment
+                      </button>
+                    )}
+                    {hasPermission('fuelEdit') && (
+                      <button onClick={() => { if (confirm('Delete this tanker?')) deleteTanker.mutate(t.id); }}
+                        className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    )}
                     <button onClick={() => setExpandedId(isExpanded ? null : t.id)} className="p-1.5 text-gray-400 hover:text-gray-700">
                       {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
@@ -311,8 +319,10 @@ function TankersTab() {
                                 </div>
                               </div>
                               {c.notes && <p className="text-xs text-gray-400 truncate max-w-[120px]">{c.notes}</p>}
-                              <button onClick={() => { if (confirm('Remove compartment?')) deleteCompartment.mutate(c.id); }}
-                                className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                              {hasPermission('fuelEdit') && (
+                                <button onClick={() => { if (confirm('Remove compartment?')) deleteCompartment.mutate(c.id); }}
+                                  className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                              )}
                             </div>
                           );
                         })}
@@ -408,6 +418,7 @@ function TankersTab() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function DeliveriesTab() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -476,10 +487,12 @@ function DeliveriesTab() {
             </button>
           ))}
         </div>
-        <button onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg shrink-0">
-          <Plus size={16} /> Plan Route
-        </button>
+        {hasPermission('fuelAdd') && (
+          <button onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg shrink-0">
+            <Plus size={16} /> Plan Route
+          </button>
+        )}
       </div>
 
       {deliveries.length === 0 ? (
@@ -510,13 +523,13 @@ function DeliveriesTab() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {nextStatus && (
+                    {nextStatus && hasPermission('fuelEdit') && (
                       <button onClick={() => updateStatus.mutate({ id: d.id, status: nextStatus })}
                         className="text-xs border border-brand-300 text-brand-700 hover:bg-brand-50 rounded px-2 py-1 font-medium">
                         → {nextStatus.replace('_', ' ')}
                       </button>
                     )}
-                    {['PLANNED', 'CANCELLED'].includes(d.status) && (
+                    {['PLANNED', 'CANCELLED'].includes(d.status) && hasPermission('fuelEdit') && (
                       <button onClick={() => { if (confirm('Delete delivery?')) deleteDelivery.mutate(d.id); }}
                         className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
                     )}
@@ -547,7 +560,7 @@ function DeliveriesTab() {
                             : `${stop.plannedVolume.toLocaleString()} L`}
                         </span>
                         <Badge label={stop.status} color={STOP_STATUS_COLORS[stop.status] ?? 'bg-gray-100 text-gray-600'} />
-                        {stop.status === 'PENDING' && d.status === 'IN_TRANSIT' && (
+                        {stop.status === 'PENDING' && d.status === 'IN_TRANSIT' && hasPermission('fuelEdit') && (
                           <div className="flex gap-1 shrink-0">
                             <button
                               onClick={() => updateStop.mutate({ deliveryId: d.id, stopId: stop.id, status: 'DELIVERED', deliveredVolume: stop.plannedVolume })}
@@ -661,6 +674,7 @@ function DeliveriesTab() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function LoadsTab() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [loadsSearch, setLoadsSearch]     = useState('');
@@ -750,10 +764,12 @@ function LoadsTab() {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-          <Plus size={16} /> Log Load
-        </button>
+        {hasPermission('fuelAdd') && (
+          <button onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+            <Plus size={16} /> Log Load
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -800,8 +816,10 @@ function LoadsTab() {
                   <td className="px-4 py-3 text-right text-gray-700">{fmtMoney(Number(l.pricePerLitre))}</td>
                   <td className="px-4 py-3 text-right font-semibold">{fmtMoney(Number(l.totalCost))}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { if (confirm('Delete this load record?')) deleteLoad.mutate(l.id); }}
-                      className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    {hasPermission('fuelEdit') && (
+                      <button onClick={() => { if (confirm('Delete this load record?')) deleteLoad.mutate(l.id); }}
+                        className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    )}
                   </td>
                 </tr>
               ))}

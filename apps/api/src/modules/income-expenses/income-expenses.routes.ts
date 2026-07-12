@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, requirePermission } from '../../middleware/authenticate';
 import { incomeExpensesService } from './income-expenses.service';
 import { z } from 'zod';
 
@@ -20,13 +20,13 @@ const createSchema = z.object({
   date:        z.string().min(1),
 });
 
-router.get('/summary', async (req, res, next) => {
+router.get('/summary', requirePermission('incomeExpenseList'), async (req, res, next) => {
   try {
     res.json(await incomeExpensesService.getSummary(req.query.vehicleId ? +req.query.vehicleId : undefined));
   } catch(e) { next(e); }
 });
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission('incomeExpenseList'), async (req, res, next) => {
   try {
     const filters = {
       vehicleId: req.query.vehicleId ? +req.query.vehicleId : undefined,
@@ -37,9 +37,9 @@ router.get('/', async (req, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.get('/:id',    async (req, res, next) => { try { res.json(await incomeExpensesService.findById(+req.params.id)); }                                                   catch(e) { next(e); } });
-router.post('/',      async (req, res, next) => { try { res.status(201).json(await incomeExpensesService.create(createSchema.parse(req.body))); }                           catch(e) { next(e); } });
-router.put('/:id',    async (req, res, next) => { try { res.json(await incomeExpensesService.update(+req.params.id, req.body)); }                                           catch(e) { next(e); } });
-router.delete('/:id', async (req, res, next) => { try { await incomeExpensesService.remove(+req.params.id); res.json({ message: 'Record deleted' }); }                    catch(e) { next(e); } });
+router.get('/:id',    requirePermission('incomeExpenseList'), async (req, res, next) => { try { res.json(await incomeExpensesService.findById(+req.params.id)); }                                                   catch(e) { next(e); } });
+router.post('/',      requirePermission('incomeExpenseEdit'), async (req, res, next) => { try { res.status(201).json(await incomeExpensesService.create(createSchema.parse(req.body))); }                           catch(e) { next(e); } });
+router.put('/:id',    requirePermission('incomeExpenseEdit'), async (req, res, next) => { try { res.json(await incomeExpensesService.update(+req.params.id, req.body)); }                                           catch(e) { next(e); } });
+router.delete('/:id', requirePermission('incomeExpenseEdit'), async (req, res, next) => { try { await incomeExpensesService.remove(+req.params.id); res.json({ message: 'Record deleted' }); }                    catch(e) { next(e); } });
 
 export default router;

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Plus, Trash2, Loader2, AlertCircle, Bell, Check } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { format, isPast, isWithinInterval, addDays } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Reminder {
   id: number;
@@ -37,6 +38,7 @@ function dueBadge(dueDate: string) {
 }
 
 export default function RemindersPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -103,9 +105,11 @@ export default function RemindersPage() {
             className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${unreadOnly ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 hover:border-brand-500'}`}>
             <Bell size={15}/> {unreadOnly ? 'Unread only' : 'All'}
           </button>
-          <button onClick={() => { reset(); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-            <Plus size={16}/> Add Reminder
-          </button>
+          {hasPermission('reminderAdd') && (
+            <button onClick={() => { reset(); setModalOpen(true); }} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+              <Plus size={16}/> Add Reminder
+            </button>
+          )}
         </div>
       </div>
 
@@ -144,7 +148,9 @@ export default function RemindersPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {!r.isRead && <button onClick={() => markReadMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-green-600" title="Mark read"><Check size={16}/></button>}
-                    <button onClick={() => confirm(`Delete "${r.title}"?`) && deleteMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    {hasPermission('reminderDelete') && (
+                      <button onClick={() => confirm(`Delete "${r.title}"?`) && deleteMut.mutate(r.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    )}
                   </div>
                 </div>
               );

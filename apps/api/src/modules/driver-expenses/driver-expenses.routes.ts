@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, requirePermission } from '../../middleware/authenticate';
 import { driverExpensesService } from './driver-expenses.service';
 import { z } from 'zod';
 
@@ -19,7 +19,7 @@ const createSchema = z.object({
   date:        z.string().min(1),
 });
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission('driverList'), async (req, res, next) => {
   try {
     const filters = {
       driverId: req.query.driverId ? +req.query.driverId : undefined,
@@ -29,9 +29,9 @@ router.get('/', async (req, res, next) => {
   } catch(e) { next(e); }
 });
 
-router.get('/:id',    async (req, res, next) => { try { res.json(await driverExpensesService.findById(+req.params.id)); }                                        catch(e) { next(e); } });
-router.post('/',      async (req, res, next) => { try { res.status(201).json(await driverExpensesService.create(createSchema.parse(req.body))); }               catch(e) { next(e); } });
-router.put('/:id',    async (req, res, next) => { try { res.json(await driverExpensesService.update(+req.params.id, req.body)); }                                catch(e) { next(e); } });
-router.delete('/:id', async (req, res, next) => { try { await driverExpensesService.remove(+req.params.id); res.json({ message: 'Record deleted' }); }         catch(e) { next(e); } });
+router.get('/:id',    requirePermission('driverList'), async (req, res, next) => { try { res.json(await driverExpensesService.findById(+req.params.id)); }                                        catch(e) { next(e); } });
+router.post('/',      requirePermission('driverEdit'), async (req, res, next) => { try { res.status(201).json(await driverExpensesService.create(createSchema.parse(req.body))); }               catch(e) { next(e); } });
+router.put('/:id',    requirePermission('driverEdit'), async (req, res, next) => { try { res.json(await driverExpensesService.update(+req.params.id, req.body)); }                                catch(e) { next(e); } });
+router.delete('/:id', requirePermission('driverEdit'), async (req, res, next) => { try { await driverExpensesService.remove(+req.params.id); res.json({ message: 'Record deleted' }); }         catch(e) { next(e); } });
 
 export default router;

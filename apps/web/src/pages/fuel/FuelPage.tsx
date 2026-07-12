@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Plus, Trash2, Loader2, AlertCircle, Fuel } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import { format } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 /* ── helpers ─────────────────────────────────────────── */
 
@@ -58,6 +59,7 @@ interface DriverOption  { id: number; name: string; }
 /* ── component ──────────────────────────────────────── */
 
 export default function FuelPage() {
+  const hasPermission = useAuthStore(s => s.hasPermission);
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -108,10 +110,12 @@ export default function FuelPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Fuel</h1>
-        <button onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Log Fill-up
-        </button>
+        {hasPermission('fuelAdd') && (
+          <button onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Plus size={16} /> Log Fill-up
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -164,8 +168,10 @@ export default function FuelPage() {
                   <td className="px-4 py-3 text-gray-500">{r.odometer ? `${r.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-4 py-3 text-gray-500">{r.notes ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { if (confirm('Delete this fuel record?')) deleteMut.mutate(r.id); }}
-                      className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                    {hasPermission('fuelEdit') && (
+                      <button onClick={() => { if (confirm('Delete this fuel record?')) deleteMut.mutate(r.id); }}
+                        className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                    )}
                   </td>
                 </tr>
               ))}

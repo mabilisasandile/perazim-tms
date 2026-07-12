@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { tripsController } from './trips.controller';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, requirePermission } from '../../middleware/authenticate';
 
 const uploadDir = path.join(process.cwd(), 'uploads', 'trips');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -61,12 +61,12 @@ router.use(authenticate);
  *       200:
  *         description: Array of trips
  */
-router.get('/', tripsController.list);
-router.get('/:id', tripsController.get);
-router.post('/', tripsController.create);
-router.post('/:id/pictures', upload.fields(pictureFields), tripsController.uploadPictures);
-router.put('/:id', tripsController.update);
-router.patch('/:id/status', tripsController.updateStatus);
-router.delete('/:id', tripsController.remove);
+router.get('/', requirePermission('tripList'), tripsController.list);
+router.get('/:id', requirePermission('tripList'), tripsController.get);
+router.post('/', requirePermission('tripAdd'), tripsController.create);
+router.post('/:id/pictures', requirePermission('tripEdit'), upload.fields(pictureFields), tripsController.uploadPictures);
+router.put('/:id', requirePermission('tripEdit'), tripsController.update);
+router.patch('/:id/status', requirePermission('tripEdit'), tripsController.updateStatus);
+router.delete('/:id', requirePermission('tripEdit'), tripsController.remove);
 
 export default router;
