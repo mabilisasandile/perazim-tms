@@ -39,45 +39,69 @@ perazim-v2/
 │   │       │   ├── errorHandler.ts # Global error handler
 │   │       │   ├── notFound.ts
 │   │       │   └── rateLimiter.ts
-│   │       └── modules/            # Feature modules
-│   │           ├── auth/           ✅ Full implementation
-│   │           ├── dashboard/      ✅ Full implementation
-│   │           ├── trips/          ✅ Full implementation
-│   │           ├── vehicles/       ✅ Full implementation
-│   │           ├── drivers/        🔲 Stub — implement next
-│   │           ├── trailers/       🔲 Stub
-│   │           ├── customers/      🔲 Stub
-│   │           ├── fuel/           🔲 Stub
-│   │           ├── quotations/     🔲 Stub
-│   │           ├── invoices/       🔲 Stub
-│   │           ├── payments/       🔲 Stub
-│   │           ├── geofences/      🔲 Stub
-│   │           ├── inspections/    🔲 Stub
-│   │           ├── loadsheets/     🔲 Stub
-│   │           ├── reminders/      🔲 Stub
-│   │           ├── settings/       🔲 Stub
-│   │           └── positions/      🔲 Stub
+│   │       └── modules/            # Feature modules — all ✅ full implementation
+│   │           ├── auth/
+│   │           ├── users/
+│   │           ├── dashboard/
+│   │           ├── vehicles/
+│   │           ├── drivers/
+│   │           ├── driver-docs/
+│   │           ├── driver-expenses/
+│   │           ├── trailers/
+│   │           ├── trips/
+│   │           ├── customers/
+│   │           ├── collections/
+│   │           ├── fuel/
+│   │           ├── fuel-tanker/
+│   │           ├── flat-deck/
+│   │           ├── quotations/
+│   │           ├── invoices/
+│   │           ├── payments/
+│   │           ├── payroll/
+│   │           ├── income-expenses/
+│   │           ├── geofences/
+│   │           ├── positions/
+│   │           ├── inspections/
+│   │           ├── loadsheets/
+│   │           ├── timesheets/
+│   │           ├── warehouses/
+│   │           ├── gate-scans/
+│   │           ├── pod/            # Proof of Delivery
+│   │           ├── otp/            # Delivery OTP verification
+│   │           ├── notifications/  # Email/SMS/WhatsApp
+│   │           ├── audit-trail/
+│   │           ├── search/
+│   │           └── settings/
+│   │
+│   │       Each module follows the same 4-file pattern:
+│   │       *.schema.ts (Zod) → *.service.ts (Prisma) → *.controller.ts → *.routes.ts
 │   │
 │   └── web/                        # React frontend
 │       └── src/
 │           ├── components/
-│           │   ├── layout/
-│           │   │   └── DashboardLayout.tsx  ✅
-│           │   └── ui/
-│           │       ├── Modal.tsx            ✅
-│           │       └── Badge.tsx            ✅
+│           │   ├── auth/
+│           │   ├── layout/         # DashboardLayout, etc.
+│           │   ├── maps/           # Google Maps components
+│           │   └── ui/             # Modal, Badge, shared UI
 │           ├── lib/
 │           │   └── api.ts          # Axios client + auto-refresh
-│           ├── pages/
-│           │   ├── auth/LoginPage  ✅ Full implementation
-│           │   ├── dashboard/      ✅ Full implementation
-│           │   ├── vehicles/       ✅ Full implementation
-│           │   ├── trips/          ✅ Full implementation
-│           │   └── (others)        🔲 Stub — ready to build
+│           ├── pages/              # One folder per module, ✅ full implementation
+│           │   ├── auth/, dashboard/, vehicles/, trips/, drivers/, trailers/
+│           │   ├── customers/, fuel/, fuel-tanker/, flat-deck/, quotations/
+│           │   ├── invoices/, payments/, payroll/, income-expenses/
+│           │   ├── geofences/, fleet-map/, inspections/, bookings/
+│           │   ├── warehouses/, gate-scans/, pod/, collection/
+│           │   ├── notifications/, audit-trail/, search/, settings/
+│           │   ├── users/, reminders/, reporting/
+│           │   ├── driver/         # Driver-facing portal
+│           │   ├── customer/       # Customer-facing portal
+│           │   └── public/         # Public trip tracking page
 │           └── stores/
-│               └── authStore.ts    ✅ Zustand + persist
+│               └── authStore.ts    # Zustand + persist
 └── package.json                    # Monorepo workspace root
 ```
+
+> **Status:** All 31 backend modules and their corresponding frontend pages are fully implemented (this supersedes earlier drafts of this README that listed most modules as stubs). Three distinct front-end surfaces exist: the internal staff app, a driver portal, and a customer portal.
 
 ---
 
@@ -201,9 +225,19 @@ Trips
   PATCH  /api/v1/trips/:id/status
   DELETE /api/v1/trips/:id
 
-(Drivers, Trailers, Customers, Fuel, Quotations, Invoices,
- Payments, Geofences, Inspections, Loadsheets, Reminders,
- Settings, Positions — all stubbed at GET /, ready to implement)
+Drivers, Trailers, Customers, Fuel, Fuel Tanker, Flat Deck, Quotations,
+Invoices, Payments, Payroll, Income & Expenses, Geofences, Positions,
+Inspections, Loadsheets, Timesheets, Warehouses, Gate Scans, POD, OTP,
+Notifications, Audit Trail, Search, Settings, Users, Reminders,
+Driver Docs, Driver Expenses, Collections
+  → each follows the standard CRUD pattern:
+    GET    /api/v1/<resource>
+    GET    /api/v1/<resource>/:id
+    POST   /api/v1/<resource>
+    PUT    /api/v1/<resource>/:id
+    DELETE /api/v1/<resource>/:id
+  (plus resource-specific routes, e.g. public tracking, QR scans, OTP
+  verification — see Swagger docs for the full list)
 ```
 
 Full interactive docs at: `http://localhost:4000/api/docs`
@@ -212,58 +246,63 @@ Full interactive docs at: `http://localhost:4000/api/docs`
 
 ## Database Schema (Prisma)
 
-Key models and their PHP equivalents:
+The full schema now contains **62 models** covering every module above (fuel
+tanker, flat-deck, payroll, warehousing, gate scans, POD, OTP, notifications,
+driver docs, etc.). Below is the original subset with direct legacy PHP table
+equivalents, kept for migration reference:
 
-| Prisma Model       | PHP Table(s)                          |
-|--------------------|---------------------------------------|
-| `User`             | `login`                               |
-| `UserPermissions`  | `login_roles`                         |
-| `Customer`         | `customers`                           |
-| `Vehicle`          | `vehicles`                            |
-| `VehicleGroup`     | `vehicle_group`                       |
-| `Driver`           | `drivers`                             |
-| `Trailer`          | `trailers`                            |
-| `Trip`             | `trips`                               |
-| `TripLeg`          | `trip_legs`                           |
-| `TripExpense`      | `trips_expense`                       |
-| `TripPayment`      | `trip_payments`                       |
-| `Quotation`        | `quotations`                          |
-| `QuotationItem`    | (inline in PHP)                       |
-| `Invoice`          | `invoices`                            |
-| `Fuel`             | `fuel`                                |
-| `IncomeExpense`    | `incomeexpense`                       |
-| `DriverExpense`    | `driver_expense`                      |
-| `Geofence`         | `geofences`                           |
-| `GeofenceEvent`    | `geofence_events`                     |
-| `Position`         | `positions`                           |
-| `Inspection`       | `inspections`                         |
-| `InspectionCategory` | `inspection_categories`             |
-| `InspectionItem`   | `inspection_items`                    |
-| `InspectionImage`  | `inspection_images`                   |
-| `LoadSheet`        | `load_sheets`                         |
-| `Timesheet`        | `driver_register`                     |
-| `Reminder`         | `reminder`                            |
-| `Settings`         | `settings`                            |
-| `SmtpSettings`     | `settings_smtp`                       |
+| Prisma Model        | PHP Table(s)                          |
+|-------------------- |---------------------------------------|
+| `User`              | `login`                               |
+| `UserPermissions`   | `login_roles`                         |
+| `Customer`          | `customers`                           |
+| `Vehicle`           | `vehicles`                            |
+| `VehicleGroup`      | `vehicle_group`                       |
+| `Driver`            | `drivers`                             |
+| `Trailer`           | `trailers`                            |
+| `Trip`              | `trips`                               |
+| `TripLeg`           | `trip_legs`                           |
+| `TripExpense`       | `trips_expense`                       |
+| `TripPayment`       | `trip_payments`                       |
+| `Quotation`         | `quotations`                          |
+| `QuotationItem`     | (inline in PHP)                       |
+| `Invoice`           | `invoices`                            |
+| `Fuel`              | `fuel`                                |
+| `IncomeExpense`     | `incomeexpense`                       |
+| `DriverExpense`     | `driver_expense`                      |
+| `Geofence`          | `geofences`                           |
+| `GeofenceEvent`     | `geofence_events`                     |
+| `Position`          | `positions`                           |
+| `Inspection`        | `inspections`                         |
+| `InspectionCategory`| `inspection_categories`               |
+| `InspectionItem`    | `inspection_items`                    |
+| `InspectionImage`   | `inspection_images`                   |
+| `LoadSheet`         | `load_sheets`                         |
+| `Timesheet`         | `driver_register`                     |
+| `Reminder`          | `reminder`                            |
+| `Settings`          | `settings`                            |
+| `SmtpSettings`      | `settings_smtp`                       |
 
 ---
 
-## Implementing a Stub Module
+## Module Pattern Reference
 
-Every stub module follows the same pattern. Here's the recipe for, say, **Drivers**:
+Every module in the codebase follows the same pattern (all 31 modules below are
+fully built out — use this as a reference when adding a **new** module, e.g. the
+planned AI document-extraction module):
 
-### Backend (`apps/api/src/modules/drivers/`)
+### Backend (`apps/api/src/modules/<module>/`)
 
-1. **`drivers.schema.ts`** — Zod schema for create/update
-2. **`drivers.service.ts`** — Prisma queries (findAll, findById, create, update, remove)
-3. **`drivers.controller.ts`** — Express handlers calling the service
-4. **`drivers.routes.ts`** — Replace the stub with real routes + Swagger JSDoc
+1. **`<module>.schema.ts`** — Zod schema for create/update
+2. **`<module>.service.ts`** — Prisma queries (findAll, findById, create, update, remove)
+3. **`<module>.controller.ts`** — Express handlers calling the service
+4. **`<module>.routes.ts`** — Route definitions + Swagger JSDoc
 
-### Frontend (`apps/web/src/pages/drivers/`)
+### Frontend (`apps/web/src/pages/<module>/`)
 
-1. Replace `DriversPage.tsx` stub with list table + add/edit modal
-2. Use `useQuery` for data fetching, `useMutation` for CUD operations
-3. Follow the `VehiclesPage.tsx` pattern exactly
+1. `<Module>Page.tsx` — list table + add/edit modal
+2. Use `useQuery` for data fetching, `useMutation` for create/update/delete
+3. Follow the existing `VehiclesPage.tsx` / `TripsPage.tsx` pattern
 
 ---
 
