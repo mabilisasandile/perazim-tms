@@ -989,8 +989,16 @@ model ProofOfDelivery {
   receiverLastName    String
   receiverPhone       String
   receiverEmail       String?
-  receiverIdNumber    String?
+  // Recipient identity — staff/driver picks ONE of ID or Passport rather
+  // than being asked for both.
+  identificationType   String? // "ID" | "PASSPORT"
+  receiverIdNumber     String?
+  receiverPassportNumber String?
   relationshipToOwner String?
+
+  // A photograph of the recipient themselves, distinct from the general
+  // delivery/vehicle photos stored in PodPhoto.
+  receiverPhotoPath String?
 
   // Delivery Verification
   signature       String   @db.LongText

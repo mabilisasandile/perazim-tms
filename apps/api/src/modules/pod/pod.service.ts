@@ -1,6 +1,26 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { otpService } from '../otp/otp.service';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
+const PHOTO_DIR = path.join(process.cwd(), 'uploads', 'pod');
+if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
+
+/**
+ * Decodes a `data:image/...;base64,...` string captured directly in the
+ * delivery wizard and saves it to disk, returning the public path.
+ */
+function saveBase64Photo(dataUrl: string): string {
+  const match = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) throw new AppError('Invalid recipient photo data', 400);
+  const [, ext, base64Data] = match;
+  const safeExt = ext === 'jpeg' ? 'jpg' : ext;
+  const filename = `receiver-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${safeExt}`;
+  fs.writeFileSync(path.join(PHOTO_DIR, filename), Buffer.from(base64Data, 'base64'));
+  return `/uploads/pod/${filename}`;
+}
 
 const tripSelect = {
   id: true,
@@ -56,8 +76,11 @@ export const podService = {
     receiverLastName:    string;
     receiverPhone:       string;
     receiverEmail?:      string;
+    identificationType?: 'ID' | 'PASSPORT';
     receiverIdNumber?:   string;
+    receiverPassportNumber?: string;
     relationshipToOwner?: string;
+    receiverPhotoBase64: string;
     signature:           string;
     gpsLatitude?:        number;
     gpsLongitude?:       number;
@@ -76,8 +99,11 @@ export const podService = {
       );
     }
 
+    const { receiverPhotoBase64, ...rest } = data;
+    const receiverPhotoPath = saveBase64Photo(receiverPhotoBase64);
+
     return prisma.proofOfDelivery.create({
-      data,
+      data: { ...rest, receiverPhotoPath },
       include: {
         trip:   { select: tripSelect },
         photos: true,
@@ -88,6 +114,19 @@ export const podService = {
   async remove(id: number) {
     await this.findById(id);
     return prisma.proofOfDelivery.delete({ where: { id } });
+  },
+
+  /**
+   * Sets the recipient's own photograph — distinct from the general
+   * delivery/vehicle photos stored in PodPhoto.
+   */
+  async setReceiverPhoto(podId: number, path: string) {
+    await this.findById(podId);
+    return prisma.proofOfDelivery.update({
+      where: { id: podId },
+      data: { receiverPhotoPath: path },
+      include: { trip: { select: tripSelect }, photos: true },
+    });
   },
 
   async addPhoto(podId: number, filename: string, path: string) {

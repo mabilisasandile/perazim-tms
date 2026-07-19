@@ -37,14 +37,28 @@ const createSchema = z.object({
   receiverLastName:     z.string().min(1),
   receiverPhone:        z.string().min(1),
   receiverEmail:        z.string().email().optional().or(z.literal('')),
+  // Recipient identity — pick ONE of ID number or Passport number, not both.
+  identificationType:   z.enum(['ID', 'PASSPORT']).optional(),
   receiverIdNumber:     z.string().optional(),
+  receiverPassportNumber: z.string().optional(),
   relationshipToOwner:  z.string().optional(),
+  // A photograph of the recipient, captured as part of the delivery flow —
+  // required, sent as a base64 data URL (data:image/...;base64,...).
+  receiverPhotoBase64:  z.string().min(1, 'A photograph of the recipient is required'),
   signature:            z.string().min(1),
   gpsLatitude:          z.coerce.number().optional(),
   gpsLongitude:         z.coerce.number().optional(),
   gpsAccuracy:          z.coerce.number().optional(),
   deliveredAt:          z.coerce.date().optional(),
   notes:                z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (!data.identificationType) return; // identity capture is optional overall
+  if (data.identificationType === 'ID' && !data.receiverIdNumber) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['receiverIdNumber'], message: 'ID number is required when identificationType is ID' });
+  }
+  if (data.identificationType === 'PASSPORT' && !data.receiverPassportNumber) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['receiverPassportNumber'], message: 'Passport number is required when identificationType is PASSPORT' });
+  }
 });
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -81,6 +95,17 @@ router.delete('/:id', async (req, res, next) => {
   try {
     await podService.remove(+req.params.id);
     res.json({ message: 'Proof of delivery deleted' });
+  } catch (e) { next(e); }
+});
+
+// ── Recipient photograph (distinct from general delivery/vehicle photos) ───────
+
+router.post('/:id/receiver-photo', upload.single('receiverPhoto'), async (req: any, res, next) => {
+  try {
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file) return res.status(400).json({ error: 'No image uploaded' });
+    const pod = await podService.setReceiverPhoto(+req.params.id, `/uploads/pod/${file.filename}`);
+    res.status(201).json(pod);
   } catch (e) { next(e); }
 });
 

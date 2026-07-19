@@ -7,7 +7,7 @@ import {
   Plus, Loader2, Eye, Trash2, CheckCircle2, MapPin, Camera,
   Phone, Mail, CreditCard, Users, Navigation, X, ChevronRight,
   Image as ImageIcon, FileCheck, Download, User, ClipboardCheck,
-  ShieldCheck, Send, KeyRound, AlertTriangle, ShieldAlert,
+  ShieldCheck, Send, KeyRound, AlertTriangle, ShieldAlert, UserCheck,
 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
@@ -26,7 +26,10 @@ interface POD {
   receiverLastName:    string;
   receiverPhone:       string;
   receiverEmail:       string | null;
+  identificationType:  'ID' | 'PASSPORT' | null;
   receiverIdNumber:    string | null;
+  receiverPassportNumber: string | null;
+  receiverPhotoPath: string | null;
   relationshipToOwner: string | null;
   signature:           string;
   gpsLatitude:         number | null;
@@ -173,6 +176,60 @@ function SigPad({ value, onChange }: { value: string; onChange: (v: string) => v
   );
 }
 
+// ── Recipient photo capture (used in the mandatory wizard step) ────────────────
+
+function PhotoCaptureField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onChange(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+        <Camera size={13} className="text-brand-600" /> {label} *
+      </label>
+      {value ? (
+        <div className="relative border rounded-xl overflow-hidden bg-gray-50 w-40">
+          <img src={value} alt={label} className="w-full aspect-square object-cover" />
+          <button
+            type="button"
+            onClick={() => { onChange(''); fileRef.current && (fileRef.current.value = ''); }}
+            className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow text-gray-400 hover:text-red-500"
+          ><X size={14} /></button>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="absolute bottom-1 inset-x-1 bg-black/60 text-white text-xs rounded py-1"
+          >Retake</button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-xl w-full justify-center text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
+        >
+          <Camera size={14} /> Take Photo
+        </button>
+      )}
+      {/* capture="user" opens the front camera directly on mobile devices */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={e => handleFile(e.target.files)}
+      />
+    </div>
+  );
+}
+
 // ── Photo upload strip ─────────────────────────────────────────────────────────
 
 function PhotoStrip({ podId, photos, onRefresh }: { podId: number; photos: PodPhoto[]; onRefresh: () => void }) {
@@ -211,6 +268,45 @@ function PhotoStrip({ podId, photos, onRefresh }: { podId: number; photos: PodPh
       ) : (
         <div className="flex items-center justify-center h-16 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs gap-2">
           <ImageIcon size={14} /> No photos uploaded yet
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReceiverPhotoCapture({ podId, photoPath, receiverName, onRefresh }: { podId: number; photoPath: string | null; receiverName: string; onRefresh: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('receiverPhoto', files[0]);
+    await api.post(`/pod/${podId}/receiver-photo`, fd);
+    setUploading(false);
+    onRefresh();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+          <UserCheck size={13} className="text-brand-600" /> Recipient Photograph
+        </label>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium">
+          {uploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />} {photoPath ? 'Retake' : 'Capture'}
+        </button>
+        {/* capture="user" opens the front camera directly on mobile devices */}
+        <input ref={fileRef} type="file" accept="image/*" capture="user" className="hidden" onChange={e => handleFile(e.target.files)} />
+      </div>
+      {photoPath ? (
+        <a href={photoPath} target="_blank" rel="noopener noreferrer" className="block w-28 aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-80 transition-opacity">
+          <img src={photoPath} alt={`Photo of ${receiverName}`} className="w-full h-full object-cover" />
+        </a>
+      ) : (
+        <div className="flex items-center justify-center h-16 w-28 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-xs gap-1.5">
+          <UserCheck size={14} /> None
         </div>
       )}
     </div>
@@ -495,7 +591,7 @@ function downloadPOD(pod: POD) {
       <div class="field"><label>Last Name</label><span>${pod.receiverLastName}</span></div>
       <div class="field"><label>Phone</label><span>${pod.receiverPhone}</span></div>
       <div class="field"><label>Email</label><span>${pod.receiverEmail ?? '—'}</span></div>
-      <div class="field"><label>ID / Passport</label><span>${pod.receiverIdNumber ?? '—'}</span></div>
+      <div class="field"><label>${pod.identificationType === 'PASSPORT' ? 'Passport' : 'ID'} Number</label><span>${(pod.identificationType === 'PASSPORT' ? pod.receiverPassportNumber : pod.receiverIdNumber) ?? '—'}</span></div>
       <div class="field"><label>Relationship to Owner</label><span>${pod.relationshipToOwner ?? '—'}</span></div>
     </div>
   </div>
@@ -534,13 +630,14 @@ function downloadPOD(pod: POD) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
-type FormStep = 'trip' | 'receiver' | 'otp' | 'verification' | 'signature';
+type FormStep = 'trip' | 'receiver' | 'otp' | 'verification' | 'photo' | 'signature';
 
 const STEPS: { id: FormStep; label: string }[] = [
   { id: 'trip',         label: 'Trip' },
   { id: 'receiver',     label: 'Receiver' },
   { id: 'otp',         label: 'OTP' },
   { id: 'verification', label: 'Location & Notes' },
+  { id: 'photo',        label: 'Photo' },
   { id: 'signature',    label: 'Signature' },
 ];
 
@@ -559,7 +656,10 @@ export default function PODPage() {
   const [receiverLastName,    setReceiverLastName]    = useState('');
   const [receiverPhone,       setReceiverPhone]       = useState('');
   const [receiverEmail,       setReceiverEmail]       = useState('');
+  const [identificationType,  setIdentificationType]  = useState<'ID' | 'PASSPORT'>('ID');
   const [receiverIdNumber,    setReceiverIdNumber]    = useState('');
+  const [receiverPassportNumber, setReceiverPassportNumber] = useState('');
+  const [receiverPhotoDataUrl, setReceiverPhotoDataUrl] = useState('');
   const [relationshipToOwner, setRelationshipToOwner] = useState('');
   const [notes,               setNotes]               = useState('');
   const [gpsLat,              setGpsLat]              = useState<number | null>(null);
@@ -621,9 +721,11 @@ export default function PODPage() {
   const openForm = () => {
     setStep('trip');
     setTripId(''); setReceiverFirstName(''); setReceiverLastName('');
-    setReceiverPhone(''); setReceiverEmail(''); setReceiverIdNumber('');
+    setReceiverPhone(''); setReceiverEmail('');
+    setIdentificationType('ID'); setReceiverIdNumber(''); setReceiverPassportNumber('');
     setRelationshipToOwner(''); setNotes('');
     setGpsLat(null); setGpsLng(null); setGpsAcc(null);
+    setReceiverPhotoDataUrl('');
     setSignature('');
     setOtpState({ status: 'none' });
     setFormOpen(true);
@@ -641,6 +743,8 @@ export default function PODPage() {
     ? (!!receiverFirstName && !!receiverLastName && !!receiverPhone)
     : step === 'otp'
     ? otpAuthorised
+    : step === 'photo'
+    ? !!receiverPhotoDataUrl
     : true;
 
   const handleSubmit = () => {
@@ -650,7 +754,10 @@ export default function PODPage() {
       receiverLastName,
       receiverPhone,
       receiverEmail:        receiverEmail || undefined,
-      receiverIdNumber:     receiverIdNumber || undefined,
+      identificationType:   (receiverIdNumber || receiverPassportNumber) ? identificationType : undefined,
+      receiverIdNumber:     identificationType === 'ID'       ? (receiverIdNumber || undefined)       : undefined,
+      receiverPassportNumber: identificationType === 'PASSPORT' ? (receiverPassportNumber || undefined) : undefined,
+      receiverPhotoBase64:  receiverPhotoDataUrl,
       relationshipToOwner:  relationshipToOwner || undefined,
       signature,
       gpsLatitude:          gpsLat ?? undefined,
@@ -766,7 +873,11 @@ export default function PODPage() {
                     <td className="px-4 py-3 text-gray-700">{pod.trip.customer.name}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{pod.receiverFirstName} {pod.receiverLastName}</p>
-                      {pod.receiverIdNumber && <p className="text-xs text-gray-400">ID: {pod.receiverIdNumber}</p>}
+                      {(pod.receiverIdNumber || pod.receiverPassportNumber) && (
+                        <p className="text-xs text-gray-400">
+                          {pod.identificationType === 'PASSPORT' ? 'Passport' : 'ID'}: {pod.identificationType === 'PASSPORT' ? pod.receiverPassportNumber : pod.receiverIdNumber}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-gray-700">{pod.receiverPhone}</p>
@@ -903,8 +1014,22 @@ export default function PODPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5"><CreditCard size={12} className="text-brand-600" /> ID / Passport Number</label>
-                <input value={receiverIdNumber} onChange={e => setReceiverIdNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="9001015009087" />
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5"><CreditCard size={12} className="text-brand-600" /> Identification</label>
+                <div className="flex gap-2 mb-1.5">
+                  <button type="button" onClick={() => setIdentificationType('ID')}
+                    className={`flex-1 text-xs font-medium rounded-lg border px-2 py-1.5 ${identificationType === 'ID' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-300'}`}>
+                    ID Number
+                  </button>
+                  <button type="button" onClick={() => setIdentificationType('PASSPORT')}
+                    className={`flex-1 text-xs font-medium rounded-lg border px-2 py-1.5 ${identificationType === 'PASSPORT' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-300'}`}>
+                    Passport Number
+                  </button>
+                </div>
+                {identificationType === 'ID' ? (
+                  <input value={receiverIdNumber} onChange={e => setReceiverIdNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="9001015009087" />
+                ) : (
+                  <input value={receiverPassportNumber} onChange={e => setReceiverPassportNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="A1234567" />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5"><Users size={12} className="text-brand-600" /> Relationship to Vehicle Owner</label>
@@ -947,7 +1072,21 @@ export default function PODPage() {
           </div>
         )}
 
-        {/* ── Step 5: Signature ─────────────────── */}
+        {/* ── Step 5: Recipient Photo ───────────── */}
+        {step === 'photo' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
+              Take a photo of <strong>{receiverFirstName} {receiverLastName}</strong> to confirm who received the vehicle. This is required before the delivery can be completed.
+            </div>
+            <PhotoCaptureField
+              value={receiverPhotoDataUrl}
+              onChange={setReceiverPhotoDataUrl}
+              label={`Photo of ${receiverFirstName || 'recipient'}`}
+            />
+          </div>
+        )}
+
+        {/* ── Step 6: Signature ─────────────────── */}
         {step === 'signature' && (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
@@ -1042,10 +1181,13 @@ export default function PODPage() {
                     <div><p className="text-gray-400 text-xs">Email</p><p className="font-medium">{viewing.receiverEmail}</p></div>
                   </div>
                 )}
-                {viewing.receiverIdNumber && (
+                {(viewing.receiverIdNumber || viewing.receiverPassportNumber) && (
                   <div className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-lg">
                     <CreditCard size={14} className="text-gray-400 shrink-0" />
-                    <div><p className="text-gray-400 text-xs">ID / Passport</p><p className="font-medium">{viewing.receiverIdNumber}</p></div>
+                    <div>
+                      <p className="text-gray-400 text-xs">{viewing.identificationType === 'PASSPORT' ? 'Passport Number' : 'ID Number'}</p>
+                      <p className="font-medium">{viewing.identificationType === 'PASSPORT' ? viewing.receiverPassportNumber : viewing.receiverIdNumber}</p>
+                    </div>
                   </div>
                 )}
                 {viewing.relationshipToOwner && (
@@ -1070,6 +1212,14 @@ export default function PODPage() {
               <p className="text-gray-400 text-xs mb-2">Receiver Signature — {viewing.receiverFirstName} {viewing.receiverLastName}</p>
               <img src={viewing.signature} alt="Receiver signature" className="border rounded-xl bg-white p-2 w-full max-h-36 object-contain" />
             </div>
+
+            {/* Recipient photograph — distinct from general delivery photos */}
+            <ReceiverPhotoCapture
+              podId={viewing.id}
+              photoPath={viewing.receiverPhotoPath}
+              receiverName={`${viewing.receiverFirstName} ${viewing.receiverLastName}`}
+              onRefresh={reloadViewing}
+            />
 
             {/* Photos */}
             <PhotoStrip podId={viewing.id} photos={viewing.photos} onRefresh={reloadViewing} />
