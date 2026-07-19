@@ -90,6 +90,7 @@ model UserPermissions {
 
 model Customer {
   id               Int      @id @default(autoincrement())
+  customerReference String? @unique // e.g. CST00001 — customer-facing reference number
   name             String
   email            String   @unique
   phone            String?
@@ -103,6 +104,8 @@ model Customer {
   resetToken       String?
   isActive         Boolean  @default(true)
   payLaterApproved Boolean  @default(false)
+  termsAcceptedAt      DateTime?
+  termsAcceptedVersion String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -478,7 +481,8 @@ model Invoice {
   depositRequired    Decimal?  @db.Decimal(10, 2)
   depositPaid        Decimal   @default(0) @db.Decimal(10, 2)
   amountPaid         Decimal   @default(0) @db.Decimal(10, 2)
-  status             String    @default("unpaid") // unpaid | partial | paid | overdue
+  amountRefunded     Decimal   @default(0) @db.Decimal(10, 2)
+  status             String    @default("unpaid") // unpaid | partial | paid | overdue | partially_refunded | refunded
   dueDate            DateTime?
   paidAt             DateTime?
   notes              String?   @db.Text
@@ -512,7 +516,7 @@ model InvoicePayment {
   id        Int      @id @default(autoincrement())
   invoiceId Int
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  type      String   @default("PAYMENT") // DEPOSIT | PAYMENT
+  type      String   @default("PAYMENT") // DEPOSIT | PAYMENT | REFUND
   amount    Decimal  @db.Decimal(10, 2)
   method    String   @default("manual") // payfast | manual | eft | cash
   reference String?

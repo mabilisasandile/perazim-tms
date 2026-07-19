@@ -29,10 +29,18 @@ export const createInvoicePaymentSchema = z.object({
   notes:     z.string().optional().nullable(),
 });
 
+export const createRefundSchema = z.object({
+  amount:    z.coerce.number().positive(),
+  method:    z.enum(['payfast', 'manual', 'eft', 'cash']).default('manual'),
+  reference: z.string().optional().nullable(),
+  reason:    z.string().min(1, 'A reason is required for refunds'),
+});
+
 export const updateStatusSchema = z.object({
-  status: z.enum(['unpaid', 'partial', 'paid', 'overdue']),
+  status: z.enum(['unpaid', 'partial', 'paid', 'overdue', 'partially_refunded', 'refunded']),
 });
 
 export type CreateInvoiceDto        = z.infer<typeof createInvoiceSchema>;
 export type CreateInvoicePaymentDto = z.infer<typeof createInvoicePaymentSchema>;
+export type CreateRefundDto         = z.infer<typeof createRefundSchema>;
 export type InvoiceItemDto          = z.infer<typeof invoiceItemSchema>;

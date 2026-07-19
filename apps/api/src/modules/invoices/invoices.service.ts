@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { CreateInvoiceDto, CreateInvoicePaymentDto } from './invoices.schema';
+import { CreateInvoiceDto, CreateInvoicePaymentDto, CreateRefundDto } from './invoices.schema';
 import { notificationService } from '../notifications/notification.service';
 
 export const invoicesService = {
@@ -96,30 +96,85 @@ export const invoicesService = {
       },
     });
 
-    // Recalculate totals from all payments
+    await this.recalculate(invoiceId);
+    return payment;
+  },
+
+  /**
+   * Refunds part or all of what's been paid on an invoice. Recorded as its
+   * own InvoicePayment (type REFUND) so the full payment/refund history is
+   * auditable, but tracked separately from amountPaid via amountRefunded so
+   * refunds never get double-counted as new payments.
+   */
+  async refund(invoiceId: number, data: CreateRefundDto, refundedByUsername: string) {
+    const inv = await this.findById(invoiceId);
+
+    const netPaid = Number(inv.amountPaid) - Number(inv.amountRefunded);
+    if (data.amount > netPaid) {
+      throw new AppError(
+        `Refund amount (${data.amount}) cannot exceed the net amount currently paid (${netPaid})`,
+        400
+      );
+    }
+
+    const refund = await prisma.invoicePayment.create({
+      data: {
+        invoiceId,
+        type:      'REFUND',
+        amount:    data.amount,
+        method:    data.method,
+        reference: data.reference ?? null,
+        notes:     `Refunded by ${refundedByUsername}: ${data.reason}`,
+      },
+    });
+
+    await this.recalculate(invoiceId);
+    return refund;
+  },
+
+  /**
+   * Recomputes amountPaid, amountRefunded and status from the full payment
+   * history for an invoice. PAYMENT/DEPOSIT entries add to amountPaid;
+   * REFUND entries are tracked separately in amountRefunded and are never
+   * added back into amountPaid.
+   */
+  async recalculate(invoiceId: number) {
+    const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
     const allPayments = await prisma.invoicePayment.findMany({ where: { invoiceId } });
-    const amountPaid  = allPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+    const amountPaid = allPayments
+      .filter(p => p.type === 'DEPOSIT' || p.type === 'PAYMENT')
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const amountRefunded = allPayments
+      .filter(p => p.type === 'REFUND')
+      .reduce((s, p) => s + Number(p.amount), 0);
     const depositPaid = allPayments
       .filter(p => p.type === 'DEPOSIT')
       .reduce((s, p) => s + Number(p.amount), 0);
 
     const total = Number(inv.total);
+    const netPaid = amountPaid - amountRefunded;
+
     let status: string = inv.status;
     let paidAt: Date | null = inv.paidAt ? new Date(inv.paidAt as any) : null;
 
-    if (amountPaid >= total) {
+    if (amountRefunded > 0 && netPaid <= 0) {
+      status = 'refunded';
+    } else if (amountRefunded > 0 && netPaid < total) {
+      status = 'partially_refunded';
+    } else if (netPaid >= total && total > 0) {
       status = 'paid';
       paidAt = paidAt ?? new Date();
-    } else if (amountPaid > 0) {
+    } else if (netPaid > 0) {
       status = 'partial';
+    } else {
+      status = 'unpaid';
     }
 
-    await prisma.invoice.update({
+    return prisma.invoice.update({
       where: { id: invoiceId },
-      data: { amountPaid, depositPaid, status, paidAt },
+      data: { amountPaid, amountRefunded, depositPaid, status, paidAt },
     });
-
-    return payment;
   },
 
   async getPayments(invoiceId: number) {
@@ -220,6 +275,51 @@ export const invoicesService = {
       data: { status: 'overdue' },
     });
     return { updated: result.count };
+  },
+
+  /**
+   * VAT report over a date range — total ex-VAT sales, VAT collected, and
+   * gross invoiced total, broken down by month so it can be reconciled
+   * against a SARS VAT return period.
+   */
+  async getVatReport(from?: string, to?: string) {
+    const where: any = {};
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to)   where.createdAt.lte = new Date(to);
+    }
+
+    const invoices = await prisma.invoice.findMany({
+      where,
+      select: { id: true, number: true, createdAt: true, amount: true, vatAmount: true, total: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const byMonth = new Map<string, { month: string; salesExVat: number; vatCollected: number; grossInvoiced: number; invoiceCount: number }>();
+    let totals = { salesExVat: 0, vatCollected: 0, grossInvoiced: 0, invoiceCount: 0 };
+
+    for (const inv of invoices) {
+      const month = inv.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      const bucket = byMonth.get(month) ?? { month, salesExVat: 0, vatCollected: 0, grossInvoiced: 0, invoiceCount: 0 };
+      bucket.salesExVat    += Number(inv.amount);
+      bucket.vatCollected  += Number(inv.vatAmount);
+      bucket.grossInvoiced += Number(inv.total);
+      bucket.invoiceCount  += 1;
+      byMonth.set(month, bucket);
+
+      totals.salesExVat    += Number(inv.amount);
+      totals.vatCollected  += Number(inv.vatAmount);
+      totals.grossInvoiced += Number(inv.total);
+      totals.invoiceCount  += 1;
+    }
+
+    return {
+      from: from ?? null,
+      to: to ?? null,
+      totals,
+      byMonth: Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month)),
+    };
   },
 
   async getStats() {

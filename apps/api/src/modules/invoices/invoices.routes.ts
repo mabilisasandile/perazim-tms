@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { authenticate, AuthRequest } from '../../middleware/authenticate';
 import { invoicesService } from './invoices.service';
-import { createInvoiceSchema, createInvoicePaymentSchema } from './invoices.schema';
+import { createInvoiceSchema, createInvoicePaymentSchema, createRefundSchema } from './invoices.schema';
 import { auditService, getIp } from '../audit-trail/audit.service';
 
 const router = Router();
@@ -104,6 +104,32 @@ router.post('/:id/payments', upload.single('proof'), async (req: AuthRequest, re
 // ── Get payment history for an invoice ────────────────────────────────────────
 router.get('/:id/payments', async (req, res, next) => {
   try { res.json(await invoicesService.getPayments(+req.params.id)); } catch (e) { next(e); }
+});
+
+// ── Refund (full or partial) — always requires a reason for the audit trail ────
+router.post('/:id/refund', async (req: AuthRequest, res, next) => {
+  try {
+    const invoiceId = +req.params.id;
+    const dto = createRefundSchema.parse(req.body);
+    const refund = await invoicesService.refund(invoiceId, dto, req.user!.username);
+    res.status(201).json(refund);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'INVOICE_REFUNDED',
+      entityType: 'INVOICE',
+      entityId:   invoiceId,
+      newValue:   dto,
+    });
+  } catch (e) { next(e); }
+});
+
+// ── VAT report — totals + monthly breakdown for a date range ───────────────────
+router.get('/reports/vat', async (req, res, next) => {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+    res.json(await invoicesService.getVatReport(from, to));
+  } catch (e) { next(e); }
 });
 
 // ── (Re)send invoice email to customer ──────────────────────────────────────────

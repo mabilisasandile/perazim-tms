@@ -119,6 +119,22 @@ router.get('/portal/bookings', authenticateCustomer, async (req: CustomerRequest
   } catch (e) { next(e); }
 });
 
+// Customer accepts the current Terms & Conditions from the portal
+router.post('/portal/accept-terms', authenticateCustomer, async (req: CustomerRequest, res, next) => {
+  try {
+    const result = await customersService.acceptTerms(req.customer!.id);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+// Customer views their own statement (invoices, payments and refunds)
+router.get('/portal/statement', authenticateCustomer, async (req: CustomerRequest, res, next) => {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+    res.json(await customersService.getStatement(req.customer!.id, from, to));
+  } catch (e) { next(e); }
+});
+
 router.post('/portal/bookings', authenticateCustomer, async (req: CustomerRequest, res, next) => {
   try {
     const body = z.object({
@@ -215,6 +231,12 @@ router.use(authenticate);
 router.get('/',        requirePermission('customerList'), async (_req, res, next) => { try { res.json(await customersService.findAll()); }                 catch(e) { next(e); } });
 router.get('/:id',     requirePermission('customerList'), async (req,  res, next) => { try { res.json(await customersService.findById(+req.params.id)); }  catch(e) { next(e); } });
 router.get('/:id/trips', requirePermission('customerList'), async (req, res, next) => { try { res.json(await customersService.getTrips(+req.params.id)); } catch(e) { next(e); } });
+router.get('/:id/statement', requirePermission('customerList'), async (req, res, next) => {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+    res.json(await customersService.getStatement(+req.params.id, from, to));
+  } catch(e) { next(e); }
+});
 
 router.post('/', requirePermission('customerAdd'), async (req: AuthRequest, res, next) => {
   try {
