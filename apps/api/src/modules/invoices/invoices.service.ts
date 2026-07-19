@@ -149,6 +149,70 @@ export const invoicesService = {
     return { message: 'Invoice email sent', email: inv.customer?.email ?? null };
   },
 
+  /**
+   * Generates one invoice per vehicle/trip within a booking that doesn't
+   * already have an invoice — used when a customer books multiple vehicles
+   * under a single booking and needs an invoice per vehicle.
+   */
+  async generateForBooking(bookingId: number) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { trips: { include: { invoices: true } } },
+    });
+    if (!booking) throw new AppError('Booking not found', 404);
+
+    const settings = await prisma.settings.findFirst();
+    const vatRate = settings?.vat ?? 15;
+
+    const created = [];
+    for (const trip of booking.trips) {
+      if (trip.invoices.length > 0) continue; // already invoiced
+
+      const count = await prisma.invoice.count();
+      const number = `INV-${String(count + 1).padStart(5, '0')}`;
+      const amount = Number(trip.amount ?? 0);
+      const vatAmount = amount * (vatRate / 100);
+      const total = amount + vatAmount;
+
+      const inv = await prisma.invoice.create({
+        data: {
+          number,
+          customerId: booking.customerId,
+          tripId: trip.id,
+          bookingId: booking.id,
+          amount,
+          vatAmount,
+          total,
+          status: 'unpaid',
+          vehicleDescription: [trip.customerVehicleMake, trip.customerVehicleRegistration]
+            .filter(Boolean).join(' — ') || null,
+          vehicleCondition: trip.vehicleCondition,
+        },
+        include: { customer: { select: { id: true, name: true, email: true, phone: true, payLaterApproved: true } } },
+      });
+      created.push(inv);
+    }
+    return created;
+  },
+
+  /**
+   * Emails every invoice tied to a booking in one action — supports the
+   * "send multiple invoices at once when a customer has more than one
+   * vehicle" requirement.
+   */
+  async sendForBooking(bookingId: number) {
+    const invoices = await prisma.invoice.findMany({
+      where: { bookingId },
+      include: { customer: { select: { id: true, name: true, email: true, phone: true, payLaterApproved: true } } },
+    });
+    if (invoices.length === 0) throw new AppError('No invoices found for this booking', 404);
+
+    for (const inv of invoices) {
+      await notificationService.dispatch('INVOICE_NOTIFICATION', { invoice: inv }).catch(() => {});
+    }
+    return { message: `${invoices.length} invoice(s) sent`, count: invoices.length };
+  },
+
   async markOverdue() {
     const now = new Date();
     const result = await prisma.invoice.updateMany({

@@ -32,6 +32,7 @@ model User {
 
   permissions UserPermissions?
   trips       Trip[]           @relation("TripCreatedBy")
+  bookings    Booking[]        @relation("BookingCreatedBy")
 
   @@index([role])
   @@map("users")
@@ -108,6 +109,7 @@ model Customer {
   trips      Trip[]
   quotations Quotation[]
   invoices   Invoice[]
+  bookings   Booking[]
 
   @@map("customers")
 }
@@ -248,6 +250,41 @@ enum TripStatus {
   CANCELLED
 }
 
+// ─────────────────────────────────────────────
+// BOOKINGS
+// A single Booking groups one or more vehicle Trips together for a
+// customer, so a customer with several vehicles can be handled under
+// one shared booking reference / invoice run.
+// ─────────────────────────────────────────────
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  bookingNumber String        @unique // e.g. BK-2026-00001
+  customerId    Int
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  status        BookingStatus @default(PENDING)
+  notes         String?       @db.Text
+
+  createdById Int?
+  createdBy   User?    @relation("BookingCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trips    Trip[]
+  invoices Invoice[]
+
+  @@index([customerId])
+  @@map("bookings")
+}
+
 enum TripType {
   SINGLE
   MULTI_LEG
@@ -258,6 +295,9 @@ model Trip {
   trackingCode String     @unique @default(cuid())
   type         TripType   @default(SINGLE)
   status       TripStatus @default(PENDING)
+
+  bookingId Int?
+  booking   Booking? @relation(fields: [bookingId], references: [id])
 
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
@@ -321,6 +361,7 @@ model Trip {
   invoices              Invoice[]
   loadSheetVehicle      TruckLoadSheetVehicle?  @relation("TripLoadSheetVehicle")
 
+  @@index([bookingId])
   @@map("trips")
 }
 
@@ -429,6 +470,8 @@ model Invoice {
   customer           Customer  @relation(fields: [customerId], references: [id])
   tripId             Int?
   trip               Trip?     @relation(fields: [tripId], references: [id])
+  bookingId          Int?
+  booking            Booking?  @relation(fields: [bookingId], references: [id])
   amount             Decimal   @db.Decimal(10, 2)
   vatAmount          Decimal   @db.Decimal(10, 2)
   total              Decimal   @db.Decimal(10, 2)
@@ -447,6 +490,7 @@ model Invoice {
   items    InvoiceItem[]
   payments InvoicePayment[]
 
+  @@index([bookingId])
   @@map("invoices")
 }
 

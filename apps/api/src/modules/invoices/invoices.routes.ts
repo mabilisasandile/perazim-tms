@@ -122,6 +122,41 @@ router.post('/:id/email', async (req: AuthRequest, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ── Batch invoicing for multi-vehicle bookings ─────────────────────────────────
+// Generates one invoice per vehicle/trip in a booking that doesn't have one yet.
+router.post('/booking/:bookingId/generate', async (req: AuthRequest, res, next) => {
+  try {
+    const bookingId = +req.params.bookingId;
+    const created = await invoicesService.generateForBooking(bookingId);
+    res.status(201).json(created);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'BOOKING_INVOICES_GENERATED',
+      entityType: 'BOOKING',
+      entityId:   bookingId,
+      newValue:   { count: created.length },
+    });
+  } catch (e) { next(e); }
+});
+
+// Sends every invoice tied to a booking in a single action (multiple vehicles).
+router.post('/booking/:bookingId/send', async (req: AuthRequest, res, next) => {
+  try {
+    const bookingId = +req.params.bookingId;
+    const result = await invoicesService.sendForBooking(bookingId);
+    res.json(result);
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'BOOKING_INVOICES_SENT',
+      entityType: 'BOOKING',
+      entityId:   bookingId,
+      newValue:   result,
+    });
+  } catch (e) { next(e); }
+});
+
 // ── Mark overdue ───────────────────────────────────────────────────────────────
 router.post('/mark-overdue', async (_req, res, next) => {
   try { res.json(await invoicesService.markOverdue()); } catch (e) { next(e); }
