@@ -24,6 +24,7 @@ import DriversPage        from './pages/drivers/DriversPage';
 import TripsPage          from './pages/trips/TripsPage';
 import BookingsListPage    from './pages/bookings/BookingsListPage';
 import AddBookingPage      from './pages/bookings/AddBookingPage';
+import AddMultiVehicleBookingPage from './pages/bookings/AddMultiVehicleBookingPage';
 import CustomersPage      from './pages/customers/CustomersPage';
 import QuotationsPage     from './pages/quotations/QuotationsPage';
 import InvoicesPage       from './pages/invoices/InvoicesPage';
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="trips/*"          element={<TripsPage />} />
           <Route path="bookings"         element={<BookingsListPage />} />
           <Route path="bookings/add"     element={<AddBookingPage />} />
+          <Route path="bookings/add-multi" element={<AddMultiVehicleBookingPage />} />
           <Route path="customers/*"      element={<CustomersPage />} />
           <Route path="quotations/*"     element={<QuotationsPage />} />
           <Route path="invoices/:id/view" element={<InvoiceViewPage />} />

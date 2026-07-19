@@ -101,7 +101,7 @@ perazim-v2/
 └── package.json                    # Monorepo workspace root
 ```
 
-> **Status:** All 31 backend modules and their corresponding frontend pages are fully implemented (this supersedes earlier drafts of this README that listed most modules as stubs). Three distinct front-end surfaces exist: the internal staff app, a driver portal, and a customer portal.
+> **Status:** All 31 backend modules and their corresponding frontend pages are fully implemented. Three distinct front-end surfaces exist: the internal staff app, a driver portal, and a customer portal.
 
 ---
 
@@ -115,7 +115,7 @@ perazim-v2/
 ### 1. Clone & install
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/mabilisasandile/perazim-tms.git
 cd perazim-v2
 npm install
 ```

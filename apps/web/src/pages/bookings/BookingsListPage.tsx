@@ -108,6 +108,9 @@ export default function BookingsListPage() {
           <Link to="/app/bookings/add" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             <Plus size={16} /> Add Booking
           </Link>
+          <Link to="/app/bookings/add-multi" className="flex items-center gap-2 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            <Plus size={16} /> Multi-Vehicle Booking
+          </Link>
         </div>
       </div>
 

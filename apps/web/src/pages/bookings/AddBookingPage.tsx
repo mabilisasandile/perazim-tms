@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -77,6 +77,35 @@ export default function AddBookingPage() {
   const hasLegs = watch('hasLegs');
   const fromLocationValue = watch('fromLocation') ?? '';
   const toLocationValue = watch('toLocation') ?? '';
+  const selectedCustomerId = watch('customerId');
+
+  // Pull the selected customer's trip history so we can auto-fill their
+  // vehicle details (make/model, colour, registration, VIN, stock, engine)
+  // from their most recent booking.
+  const { data: customerTrips } = useQuery<any[]>({
+    queryKey: ['customer-trips', selectedCustomerId],
+    queryFn: () => api.get(`/customers/${selectedCustomerId}/trips`).then(r => r.data),
+    enabled: !!selectedCustomerId && Number(selectedCustomerId) > 0,
+  });
+
+  const [autofilledCustomerId, setAutofilledCustomerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!selectedCustomerId || !customerTrips) return;
+    const id = Number(selectedCustomerId);
+    if (autofilledCustomerId === id) return; // already auto-filled for this customer
+
+    const lastTrip = customerTrips[0]; // trips are returned newest-first
+    if (lastTrip) {
+      setValue('customerVehicleMake', lastTrip.customerVehicleMake ?? '', { shouldValidate: true });
+      setValue('customerVehicleColour', lastTrip.customerVehicleColour ?? '', { shouldValidate: true });
+      setValue('customerVehicleRegistration', lastTrip.customerVehicleRegistration ?? '', { shouldValidate: true });
+      setValue('customerVehicleVin', lastTrip.customerVehicleVin ?? '');
+      setValue('customerVehicleStock', lastTrip.customerVehicleStock ?? '');
+      setValue('customerVehicleEngine', lastTrip.customerVehicleEngine ?? '');
+    }
+    setAutofilledCustomerId(id);
+  }, [selectedCustomerId, customerTrips, autofilledCustomerId, setValue]);
 
   const createMut = useMutation({
     mutationFn: async (d: FormData) => {
@@ -138,7 +167,12 @@ export default function AddBookingPage() {
       <form onSubmit={handleSubmit(d => createMut.mutate(d))} className="space-y-6">
         {/* CUSTOMER DETAILS */}
         <section className="bg-white rounded-xl border p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Customer Details</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Customer Details</h2>
+            {autofilledCustomerId === Number(selectedCustomerId) && customerTrips?.[0] && (
+              <span className="text-xs text-gray-400 italic">Vehicle details auto-filled from customer's last booking — edit as needed</span>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name*</label>
