@@ -138,7 +138,9 @@ router.get('/portal/trips', authenticateDriver, async (req: DriverRequest, res, 
     const trips = await prisma.trip.findMany({
       where:   { driverId: req.driver!.id },
       include: {
-        customer: { select: { name: true, phone: true } },
+        // Drivers must never receive customer contact details (phone/email) —
+        // only what's operationally needed to identify the vehicle/job.
+        customer: { select: { name: true } },
         vehicle:  { select: { name: true, registrationNo: true } },
       },
       orderBy: { createdAt: 'desc' },
