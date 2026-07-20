@@ -16,6 +16,8 @@ interface Vehicle {
   name: string;
   chassisNo: string;
   engineNo: string;
+  colour: string | null;
+  fleetNumber: string | null;
   isActive: boolean;
   registrationExpiry: string | null;
   group: { id: number; name: string } | null;
@@ -27,6 +29,8 @@ const schema = z.object({
   registrationNo: z.string().min(1, 'Registration number is required'),
   chassisNo: z.string().min(1, 'Chassis number is required'),
   engineNo: z.string().min(1, 'Engine number is required'),
+  colour: z.string().optional(),
+  fleetNumber: z.string().optional(),
   apiUsername: z.string().optional(),
   registrationExpiry: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -36,7 +40,7 @@ type FormData = z.infer<typeof schema>;
 
 interface VehicleGroup { id: number; name: string; }
 
-type SortKey = 'id' | 'name' | 'registrationNo' | 'chassisNo' | 'engineNo' | 'registrationExpiry' | 'isActive';
+type SortKey = 'id' | 'name' | 'registrationNo' | 'chassisNo' | 'engineNo' | 'fleetNumber' | 'registrationExpiry' | 'isActive';
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: 'asc' | 'desc' }) {
   if (sortKey !== col) return <ChevronsUpDown size={13} className="text-gray-400 ml-1 inline" />;
@@ -93,7 +97,7 @@ export default function VehiclesPage() {
   const openAdd = () => {
     setEditing(null);
     setFormError(null);
-    reset({ name: '', registrationNo: '', chassisNo: '', engineNo: '', isActive: true, groupId: null });
+    reset({ name: '', registrationNo: '', chassisNo: '', engineNo: '', colour: '', fleetNumber: '', isActive: true, groupId: null });
     setModalOpen(true);
   };
 
@@ -105,6 +109,8 @@ export default function VehiclesPage() {
       registrationNo: v.registrationNo,
       chassisNo: v.chassisNo,
       engineNo: v.engineNo,
+      colour: v.colour ?? '',
+      fleetNumber: v.fleetNumber ?? '',
       isActive: v.isActive,
       groupId: v.group?.id ?? null,
       registrationExpiry: v.registrationExpiry?.split('T')[0] ?? '',
@@ -147,7 +153,8 @@ export default function VehiclesPage() {
       v.name.toLowerCase().includes(q) ||
       v.registrationNo.toLowerCase().includes(q) ||
       v.chassisNo.toLowerCase().includes(q) ||
-      v.engineNo.toLowerCase().includes(q)
+      v.engineNo.toLowerCase().includes(q) ||
+      (v.fleetNumber?.toLowerCase().includes(q) ?? false)
     );
   });
 
@@ -243,9 +250,13 @@ export default function VehiclesPage() {
                 <th className={thClass} onClick={() => toggleSort('chassisNo')}>
                   Chassis No <SortIcon col="chassisNo" sortKey={sortKey} sortDir={sortDir} />
                 </th>
+                <th className={thClass} onClick={() => toggleSort('fleetNumber')}>
+                  Fleet # <SortIcon col="fleetNumber" sortKey={sortKey} sortDir={sortDir} />
+                </th>
                 <th className={thClass} onClick={() => toggleSort('engineNo')}>
                   Engine Number <SortIcon col="engineNo" sortKey={sortKey} sortDir={sortDir} />
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Colour</th>
                 <th className={thClass} onClick={() => toggleSort('registrationExpiry')}>
                   License Expiry <SortIcon col="registrationExpiry" sortKey={sortKey} sortDir={sortDir} />
                 </th>
@@ -258,7 +269,7 @@ export default function VehiclesPage() {
             <tbody className="divide-y divide-gray-100">
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={10} className="px-4 py-10 text-center text-gray-400">
                     {search ? 'No vehicles match your search.' : 'No vehicles yet. Add your first one.'}
                   </td>
                 </tr>
@@ -271,7 +282,16 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-500">{v.registrationNo}</td>
                     <td className="px-4 py-3 text-gray-500">{v.chassisNo}</td>
+                    <td className="px-4 py-3 text-gray-500">{v.fleetNumber ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500">{v.engineNo}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {v.colour ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: v.colour }} />
+                          {v.colour}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {v.registrationExpiry ? v.registrationExpiry.split('T')[0] : '—'}
                     </td>
@@ -369,6 +389,19 @@ export default function VehiclesPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Engine No *</label>
               <input {...register('engineNo')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
               {errors.engineNo && <p className="text-red-500 text-xs mt-1">{errors.engineNo.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fleet Number</label>
+              <input {...register('fleetNumber')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. H003" />
+              {errors.fleetNumber && <p className="text-red-500 text-xs mt-1">{errors.fleetNumber.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Colour</label>
+              <input {...register('colour')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. White" />
+              {errors.colour && <p className="text-red-500 text-xs mt-1">{errors.colour.message}</p>}
             </div>
           </div>
 

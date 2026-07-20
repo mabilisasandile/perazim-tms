@@ -5,6 +5,8 @@ export const createVehicleSchema = z.object({
   name:               z.string().min(1, 'Vehicle name is required'),
   chassisNo:          z.string().min(1, 'Chassis number is required'),
   engineNo:           z.string().min(1, 'Engine number is required'),
+  colour:             z.string().optional(),
+  fleetNumber:        z.string().optional(),
   apiUsername:        z.string().optional(),
   groupId:            z.number().int().positive().optional().nullable(),
   registrationExpiry: z.string().optional().nullable(),

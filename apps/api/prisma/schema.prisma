@@ -137,6 +137,8 @@ model Vehicle {
   name               String
   chassisNo          String
   engineNo           String
+  colour             String?
+  fleetNumber        String?       @unique
   apiUsername        String? // Cartrack Equipment ID
   groupId            Int?
   group              VehicleGroup? @relation(fields: [groupId], references: [id])
@@ -776,6 +778,8 @@ model TruckLoadSheetVehicle {
   pickupLocation   String
   deliveryLocation String
   vehicleCondition String?
+  orderNumber      String?
+  invoiceNumber    String?
   status           TruckLoadSheetVehicleStatus @default(YET_TO_START)
   assignedAt       DateTime                    @default(now())
   pickedUpAt       DateTime?

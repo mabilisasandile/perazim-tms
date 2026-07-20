@@ -5,6 +5,8 @@ const loadSheetItemSchema = z.object({
   pickupLocation:   z.string().optional(),
   deliveryLocation: z.string().optional(),
   vehicleCondition: z.enum(['Runner', 'Non-Runner']).optional(),
+  orderNumber:      z.string().optional(),
+  invoiceNumber:    z.string().optional(),
 });
 
 export const createLoadSheetSchema = z.object({
@@ -41,6 +43,13 @@ export const addVehicleSchema = z.object({
   pickupLocation:  z.string().min(1),
   deliveryLocation: z.string().min(1),
   vehicleCondition: z.enum(['Runner', 'Non-Runner']).optional(),
+  orderNumber:      z.string().optional(),
+  invoiceNumber:    z.string().optional(),
+});
+
+export const updateVehicleDetailsSchema = z.object({
+  orderNumber:   z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().nullable(),
 });
 
 export const updateVehicleStatusSchema = z.object({
@@ -53,3 +62,4 @@ export type CreateLoadSheetInput    = z.infer<typeof createLoadSheetSchema>;
 export type UpdateLoadSheetInput    = z.infer<typeof updateLoadSheetSchema>;
 export type AddVehicleInput         = z.infer<typeof addVehicleSchema>;
 export type UpdateVehicleStatusInput = z.infer<typeof updateVehicleStatusSchema>;
+export type UpdateVehicleDetailsInput = z.infer<typeof updateVehicleDetailsSchema>;

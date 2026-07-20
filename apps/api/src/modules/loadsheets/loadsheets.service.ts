@@ -7,6 +7,7 @@ import type {
   UpdateLoadSheetInput,
   AddVehicleInput,
   UpdateVehicleStatusInput,
+  UpdateVehicleDetailsInput,
 } from './loadsheets.schema';
 
 // ─── shared include shapes ────────────────────────────────────────────────────
@@ -182,6 +183,8 @@ export const loadsheetsService = {
             pickupLocation:   item.pickupLocation   || input.pickupLocation  || '',
             deliveryLocation: item.deliveryLocation || input.dropOffLocation || '',
             vehicleCondition: item.vehicleCondition ?? null,
+            orderNumber:      item.orderNumber   ?? null,
+            invoiceNumber:    item.invoiceNumber ?? null,
           })),
         } : undefined,
       },
@@ -272,6 +275,8 @@ export const loadsheetsService = {
         pickupLocation:  input.pickupLocation,
         deliveryLocation: input.deliveryLocation,
         vehicleCondition: input.vehicleCondition ?? null,
+        orderNumber:      input.orderNumber   ?? null,
+        invoiceNumber:    input.invoiceNumber ?? null,
         status:          'YET_TO_START',
         assignedAt:      new Date(),
       },
@@ -323,6 +328,20 @@ export const loadsheetsService = {
     }
 
     return updated;
+  },
+
+  // ── update vehicle order/invoice reference numbers ──────────────────────────
+
+  async updateVehicleDetails(vehicleId: number, input: UpdateVehicleDetailsInput) {
+    await getVehicleOrThrow(vehicleId);
+    return prisma.truckLoadSheetVehicle.update({
+      where: { id: vehicleId },
+      data: {
+        ...(input.orderNumber   !== undefined ? { orderNumber:   input.orderNumber }   : {}),
+        ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),
+      },
+      include: VEHICLE_INCLUDE,
+    });
   },
 
   // ── remove vehicle ───────────────────────────────────────────────────────────
@@ -451,6 +470,8 @@ export const loadsheetsService = {
         <td>${v.trip?.customerVehicleEngine ?? '-'}</td>
         <td>${v.trip?.customerVehicleRegistration ?? '-'}</td>
         <td>${v.trip?.customerVehicleStock ?? '-'}</td>
+        <td>${v.orderNumber ?? '-'}</td>
+        <td>${v.invoiceNumber ?? '-'}</td>
         <td>${v.trip?.customer?.name ?? '-'}</td>
         <td>${v.pickupLocation}</td>
         <td>${v.deliveryLocation}</td>
@@ -528,6 +549,8 @@ export const loadsheetsService = {
         <th>Engine #</th>
         <th>Reg #</th>
         <th>Stock #</th>
+        <th>Order #</th>
+        <th>Invoice #</th>
         <th>Customer</th>
         <th>Pickup</th>
         <th>Delivery</th>
@@ -535,7 +558,7 @@ export const loadsheetsService = {
         <th>Status</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:#9ca3af;">No vehicles assigned</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="12" style="text-align:center;color:#9ca3af;">No vehicles assigned</td></tr>'}</tbody>
   </table>
 
   <div class="summary">

@@ -8,6 +8,7 @@ import {
   updateLoadSheetStatusSchema,
   addVehicleSchema,
   updateVehicleStatusSchema,
+  updateVehicleDetailsSchema,
 } from './loadsheets.schema';
 
 /**
@@ -255,6 +256,35 @@ router.patch('/:id/vehicles/:vehicleId/status', async (req: AuthRequest, res, ne
       entityType: 'LOADSHEET',
       entityId:   loadSheetId,
       newValue:   { vehicleId, status: input.status },
+    });
+  } catch (e) { next(e); }
+});
+
+// ── Update vehicle order/invoice reference numbers ─────────────────────────────
+
+/**
+ * @swagger
+ * /load-sheets/{id}/vehicles/{vehicleId}:
+ *   patch:
+ *     summary: Update the order number / invoice number on a load sheet vehicle line item
+ *     tags: [LoadSheets]
+ */
+router.patch('/:id/vehicles/:vehicleId', async (req: AuthRequest, res, next) => {
+  try {
+    const loadSheetId = +req.params.id;
+    const vehicleId   = +req.params.vehicleId;
+    const input       = updateVehicleDetailsSchema.parse(req.body);
+
+    const updated = await loadsheetsService.updateVehicleDetails(vehicleId, input);
+    res.json(updated);
+
+    auditService.log({
+      username:   req.user!.username,
+      ipAddress:  getIp(req),
+      actionType: 'LOADSHEET_VEHICLE_DETAILS_UPDATED',
+      entityType: 'LOADSHEET',
+      entityId:   loadSheetId,
+      newValue:   { vehicleId, ...input },
     });
   } catch (e) { next(e); }
 });

@@ -24,7 +24,7 @@ const safeDate = (v: string | null | undefined, fmtStr: string, fallback = '—'
 
 /* ── types ──────────────────────────────────────────── */
 
-interface LoadSheetVehicle { id: number; tripId: number; status: string; trip?: TripOption; }
+interface LoadSheetVehicle { id: number; tripId: number; status: string; trip?: TripOption; orderNumber?: string | null; invoiceNumber?: string | null; }
 interface LoadSheet {
   id: number; loadSheetNo: string; status: string; notes: string | null;
   createdAt: string; startDate: string | null; endDate: string | null;
@@ -399,13 +399,19 @@ export default function LoadSheetsTab() {
               <p className="font-semibold text-gray-700 mb-2">Loaded Trips ({(viewingDetail ?? viewing).vehicles.length})</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border rounded-lg overflow-hidden">
-                  <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left">Tracking Code</th><th className="px-3 py-2 text-left">Pickup</th><th className="px-3 py-2 text-left">Delivery</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
+                  <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left">Tracking Code</th><th className="px-3 py-2 text-left">Pickup</th><th className="px-3 py-2 text-left">Delivery</th><th className="px-3 py-2 text-left">Order #</th><th className="px-3 py-2 text-left">Invoice #</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
                   <tbody className="divide-y">
                     {(viewingDetail ?? viewing).vehicles.map((v: any) => (
                       <tr key={v.id}>
                         <td className="px-3 py-2">{v.trip?.trackingCode ?? v.tripId}</td>
                         <td className="px-3 py-2 text-gray-500">{v.pickupLocation || '—'}</td>
                         <td className="px-3 py-2 text-gray-500">{v.deliveryLocation || '—'}</td>
+                        <td className="px-3 py-2 text-gray-500">
+                          <InlineRefInput loadSheetId={(viewingDetail ?? viewing).id} vehicleId={v.id} field="orderNumber" value={v.orderNumber} />
+                        </td>
+                        <td className="px-3 py-2 text-gray-500">
+                          <InlineRefInput loadSheetId={(viewingDetail ?? viewing).id} vehicleId={v.id} field="invoiceNumber" value={v.invoiceNumber} />
+                        </td>
                         <td className="px-3 py-2 text-gray-500">{v.status}</td>
                       </tr>
                     ))}
@@ -485,5 +491,41 @@ function EditLoadSheetModal({ sheet, trailers, onClose, onSave, saving }: {
         </div>
       </div>
     </Modal>
+  );
+}
+
+/* ── Inline-editable Order # / Invoice # field ───────────────────────── */
+
+function InlineRefInput({ loadSheetId, vehicleId, field, value }: { loadSheetId: number; vehicleId: number; field: 'orderNumber' | 'invoiceNumber'; value: string | null | undefined }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState(value ?? '');
+  const [saved, setSaved] = useState(false);
+
+  const saveMut = useMutation({
+    mutationFn: (val: string) => api.patch(`/loadsheets/${loadSheetId}/vehicles/${vehicleId}`, { [field]: val || null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['drivers-loadsheet-detail'] });
+      qc.invalidateQueries({ queryKey: ['drivers-loadsheets'] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1200);
+    },
+  });
+
+  const commit = () => {
+    if (draft === (value ?? '')) return; // no change, skip a needless request
+    saveMut.mutate(draft);
+  };
+
+  return (
+    <input
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      placeholder="—"
+      className={`w-24 border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 ${
+        saveMut.isPending ? 'opacity-60' : saved ? 'border-green-400 bg-green-50' : 'border-gray-200'
+      }`}
+    />
   );
 }
